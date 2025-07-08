@@ -31,7 +31,7 @@ function useZoom(
 
   const handlePinch = useCallback((e: OnPinch) => {
     const deltaY = (e as any).inputEvent.deltaY;
-    const changer = deltaY > 0 ? 0.0085 : -0.0085;
+    const changer = deltaY > 0 ? -0.0085 : 0.0085;
     const currentZoom = currentZoomRef.current;
     const newZoom = currentZoom + changer;
     if (newZoom >= 0.001 && newZoom <= 10) {

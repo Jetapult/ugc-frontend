@@ -9,7 +9,7 @@ interface Output {
 interface DownloadState {
   projectId: string;
   exporting: boolean;
-  exportType: "json" | "mp4";
+  exportType: "json" | "mp4" | "webm";
   progress: number;
   output?: Output;
   payload?: IDesign;
@@ -17,7 +17,7 @@ interface DownloadState {
   actions: {
     setProjectId: (projectId: string) => void;
     setExporting: (exporting: boolean) => void;
-    setExportType: (exportType: "json" | "mp4") => void;
+    setExportType: (exportType: "json" | "mp4" | "webm") => void;
     setProgress: (progress: number) => void;
     setState: (state: Partial<DownloadState>) => void;
     setOutput: (output: Output) => void;
@@ -29,7 +29,8 @@ interface DownloadState {
 export const useDownloadState = create<DownloadState>((set, get) => ({
   projectId: "",
   exporting: false,
-  exportType: "mp4",
+  exportType: "mp4", // default
+
   progress: 0,
   displayProgressModal: false,
   actions: {
@@ -52,17 +53,20 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
         if (!payload) throw new Error("Payload is not defined");
 
         // Step 1: POST request to start rendering
-        const response = await fetch("/api/render", {
+        const response = await fetch("http://localhost:8001/api/render", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization:
+              "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzUxOTc3NDEyfQ.ZMgBWPhRw4amD-AOk1yBqKqzUCnVCje9u_qscAdKIzA",
           },
           body: JSON.stringify({
             design: payload,
             options: {
               fps: 30,
               size: payload.size,
-              format: "mp4",
+              format: get().exportType === "webm" ? "webm" : "mp4",
+              transparent: get().exportType === "webm",
             },
           }),
         });
@@ -74,23 +78,19 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
 
         // Step 2 & 3: Polling for status updates
         const checkStatus = async () => {
-          const statusResponse = await fetch(
-            `/api/render?id=${videoId}&type=VIDEO_RENDERING`,
-          );
-
-          if (!statusResponse.ok)
-            throw new Error("Failed to fetch export status.");
-
-          const statusInfo = await statusResponse.json();
-          const { status, progress, url } = statusInfo.video;
-
-          set({ progress });
-
-          if (status === "COMPLETED") {
-            set({ exporting: false, output: { url, type: get().exportType } });
-          } else if (status === "PENDING") {
-            setTimeout(checkStatus, 2500);
-          }
+          // const statusResponse = await fetch(
+          //   `/api/render?id=${videoId}&type=VIDEO_RENDERING`,
+          // );
+          // if (!statusResponse.ok)
+          //   throw new Error("Failed to fetch export status.");
+          // const statusInfo = await statusResponse.json();
+          // const { status, progress, url } = statusInfo.video;
+          // set({ progress });
+          // if (status === "COMPLETED") {
+          //   set({ exporting: false, output: { url, type: get().exportType } });
+          // } else if (status === "PENDING") {
+          //   setTimeout(checkStatus, 2500);
+          // }
         };
 
         checkStatus();

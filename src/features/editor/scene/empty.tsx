@@ -1,4 +1,8 @@
 import useStore from "../store/use-store";
+import { dispatch } from "@designcombo/events";
+import { ADD_VIDEO } from "@designcombo/state";
+import { generateId } from "@designcombo/timeline";
+import { IVideo } from "@designcombo/types";
 import { useEffect, useRef, useState } from "react";
 import { Droppable } from "@/components/ui/droppable";
 import { PlusIcon } from "lucide-react";
@@ -29,8 +33,58 @@ const SceneEmpty = () => {
     setIsLoading(false);
   }, [size]);
 
-  const onSelectFiles = (files: File[]) => {
-    console.log({ files });
+  const onSelectFiles = async (files: File[]) => {
+    for (const file of files) {
+      if (!file.type.startsWith("video/")) {
+        console.log("Not a video");
+        return;
+      }
+      const objectUrl = URL.createObjectURL(file);
+
+      // Upload to backend to get a publicly accessible URL
+      let publicUrl: string;
+      try {
+        const { uploadFile } = await import("../../../utils/upload");
+        publicUrl = await uploadFile(file);
+      } catch (err) {
+        console.error("Failed to upload file", err);
+        // Optionally notify the user here (toast/snackbar)
+        // Abort adding this file to the timeline – we *must* have a real URL
+        URL.revokeObjectURL(objectUrl);
+        continue; // move to the next selected file
+      }
+
+      console.log("valid video");
+      // Load metadata to get duration & dimensions before dispatching
+      const videoEl = document.createElement("video");
+      videoEl.preload = "metadata";
+      videoEl.src = objectUrl;
+      videoEl.onloadedmetadata = () => {
+        const payload: Partial<IVideo> = {
+          id: generateId(),
+          type: "video",
+          duration: videoEl.duration * 1000, // ms
+          details: {
+            src: publicUrl,
+            width: videoEl.videoWidth,
+            height: videoEl.videoHeight,
+          } as any,
+          metadata: {
+            previewUrl: objectUrl,
+            name: file.name,
+          },
+        };
+
+        dispatch(ADD_VIDEO, {
+          payload,
+          options: {
+            resourceId: "main",
+            scaleMode: "fit",
+          },
+        });
+        // Removed immediate URL.revokeObjectURL(objectUrl) to avoid media element errors
+      };
+    }
   };
 
   return (
@@ -38,7 +92,7 @@ const SceneEmpty = () => {
       {!isLoading ? (
         <Droppable
           maxFileCount={4}
-          maxSize={4 * 1024 * 1024}
+          maxSize={1024 * 1024 * 1024} // allow up to 1 GB
           disabled={false}
           onValueChange={onSelectFiles}
           className="h-full w-full flex-1 bg-background"
@@ -67,7 +121,7 @@ const SceneEmpty = () => {
           </DroppableArea>
         </Droppable>
       ) : (
-        <div className="flex flex-1 items-center justify-center bg-background-subtle text-sm text-muted-foreground">
+        <div className="bg-background-subtle flex flex-1 items-center justify-center text-sm text-muted-foreground">
           Loading...
         </div>
       )}

@@ -46,7 +46,7 @@ const useDragAndDrop = (onDragStateChange?: (isDragging: boolean) => void) => {
       e.preventDefault();
       try {
         const draggedDataString = e.dataTransfer?.types[0] as string;
-        if (!draggedDataString) return;
+        if (!draggedDataString || draggedDataString === "Files") return; // ignore external file drags here
         const draggedData: DraggedData = JSON.parse(draggedDataString);
 
         if (!Object.values(AcceptedDropTypes).includes(draggedData.type))
@@ -73,12 +73,42 @@ const useDragAndDrop = (onDragStateChange?: (isDragging: boolean) => void) => {
   );
 
   const onDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
-      if (!isDraggingOver) return;
+    async (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       setIsDraggingOver(false);
       onDragStateChange?.(false);
 
+      // 1. Handle direct file drops (from desktop)
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        const previewUrl = URL.createObjectURL(file);
+        let type: AcceptedDropTypes | null = null;
+        if (file.type.startsWith("image")) type = AcceptedDropTypes.IMAGE;
+        if (file.type.startsWith("video")) type = AcceptedDropTypes.VIDEO;
+        if (file.type.startsWith("audio")) type = AcceptedDropTypes.AUDIO;
+
+        if (type) {
+          let publicUrl: string = previewUrl;
+          try {
+            const { uploadFile } = await import("../../../utils/upload");
+            publicUrl = await uploadFile(file);
+          } catch (err) {
+            console.error("Upload failed, using previewUrl", err);
+          }
+
+          const payload: DraggedData = {
+            id: generateId(),
+            type,
+            details: { src: publicUrl },
+            preview: type === AcceptedDropTypes.IMAGE ? previewUrl : undefined,
+            metadata: { previewUrl },
+          } as any;
+          handleDrop(payload);
+          return;
+        }
+      }
+
+      // 2. Handle internal element drags
       try {
         const draggedDataString = e.dataTransfer?.types[0] as string;
         const draggedData = JSON.parse(

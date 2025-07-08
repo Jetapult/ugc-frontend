@@ -13,6 +13,15 @@ export const Videos = () => {
 
   const handleAddVideo = (payload: Partial<IVideo>) => {
     // payload.details.src = "https://cdn.designcombo.dev/videos/timer-20s.mp4";
+
+    console.log("handle add video");
+    console.log(payload);
+
+    // Ensure cross-origin videos load in OffthreadVideo – add CORS proxy if needed
+    if (payload.details?.src && payload.details.src.startsWith("https://")) {
+      payload.details.src = `https://corsproxy.io/${payload.details.src}` as any;
+    }
+
     dispatch(ADD_VIDEO, {
       payload,
       options: {
@@ -27,7 +36,7 @@ export const Videos = () => {
       <div className="text-text-primary flex h-12 flex-none items-center px-4 text-sm font-medium">
         Videos
       </div>
-      <ScrollArea>
+      <ScrollArea className="flex-1">
         <div className="masonry-sm px-4">
           {VIDEOS.map((video, index) => {
             return (
@@ -76,7 +85,7 @@ const VideoItem = ({
       shouldDisplayPreview={shouldDisplayPreview}
     >
       <div
-        onClick={() =>
+        onClick={() => {
           handleAddImage({
             id: generateId(),
             details: {
@@ -85,8 +94,9 @@ const VideoItem = ({
             metadata: {
               previewUrl: video.preview,
             },
-          } as any)
-        }
+          } as any);
+          console.log("clicked add video");
+        }}
         className="flex w-full items-center justify-center overflow-hidden bg-background pb-2"
       >
         <img

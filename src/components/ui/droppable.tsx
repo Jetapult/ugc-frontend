@@ -21,6 +21,8 @@ export function Droppable(props: DroppableProps) {
     onValueChange,
     accept = {
       "image/*": [],
+      "video/*": [],
+      "audio/*": [],
     },
     maxSize = 1024 * 1024 * 2,
     maxFileCount = 1,
@@ -52,7 +54,6 @@ export function Droppable(props: DroppableProps) {
       maxFiles={maxFileCount}
       multiple={maxFileCount > 1 || multiple}
       disabled={disabled}
-      noClick
     >
       {({ getRootProps, getInputProps, isDragActive }) => (
         <div

@@ -54,10 +54,13 @@ export const calculateTextStyles = (
 });
 
 export const calculateContainerStyles = (
-  details: ITrackItem["details"],
+  details: ITrackItem["details"] | undefined,
   crop: ITrackItem["details"]["crop"] = {},
   overrides: React.CSSProperties = {},
 ): React.CSSProperties => {
+  if (!details) {
+    return { position: "absolute", ...overrides };
+  }
   return {
     pointerEvents: "auto",
     top: details.top || 0,
