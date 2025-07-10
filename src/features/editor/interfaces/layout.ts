@@ -7,6 +7,7 @@ export type IMenuItem =
   | "images"
   | "shapes"
   | "audios"
+  | "script"
   | "transitions"
   | "texts"
   | "captions"

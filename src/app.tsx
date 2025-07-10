@@ -4,6 +4,9 @@ import useDataState from "./features/editor/store/use-data-state";
 import { getCompactFontData } from "./features/editor/utils/fonts";
 import { FONTS } from "./features/editor/data/fonts";
 
+import { AuthProvider } from "@/context/AuthContext";
+import LoginDialog from "@/components/ui/login-dialog";
+
 export default function App() {
   const { setCompactFonts, setFonts } = useDataState();
 
@@ -12,5 +15,10 @@ export default function App() {
     setFonts(FONTS);
   }, []);
 
-  return <Editor />;
+  return (
+    <AuthProvider>
+      <LoginDialog />
+      <Editor />
+    </AuthProvider>
+  );
 }

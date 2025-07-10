@@ -2,6 +2,7 @@ import useLayoutStore from "../store/use-layout-store";
 import { Texts } from "./texts";
 import { Audios } from "./audios";
 import { Elements } from "./elements";
+import ScriptMenu from "../script-menu";
 import { Images } from "./images";
 import { Videos } from "./videos";
 
@@ -24,6 +25,10 @@ const ActiveMenuItem = () => {
 
   if (activeMenuItem === "images") {
     return <Images />;
+  }
+
+  if (activeMenuItem === "script") {
+    return <ScriptMenu />;
   }
 
   return null;

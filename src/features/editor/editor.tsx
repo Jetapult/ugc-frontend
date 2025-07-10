@@ -16,6 +16,7 @@ import { getCompactFontData, loadFonts } from "./utils/fonts";
 import { SECONDARY_FONT, SECONDARY_FONT_URL } from "./constants/constants";
 import MenuList from "./menu-list";
 import { MenuItem } from "./menu-item";
+
 import { ControlItem } from "./control-item";
 import CropModal from "./crop-modal/crop-modal";
 import useDataState from "./store/use-data-state";
@@ -96,7 +97,7 @@ const Editor = () => {
               <div className="bg-sidebar flex flex-none border-r border-border/80">
                 <MenuList />
                 <MenuItem />
-              </div>
+                              </div>
               <div
                 style={{
                   width: "100%",

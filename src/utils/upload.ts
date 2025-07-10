@@ -6,7 +6,11 @@
 //   { "url": "http://localhost:8002/<uuid>.mp4" }
 // Optionally the request may require a Bearer token.
 
-const UPLOAD_ENDPOINT = "http://localhost:8001/upload";
+import { getAuthToken } from "@/context/AuthContext";
+
+const BACKEND_URL =
+  (import.meta as any).env?.BACKEND_URL || "http://localhost:8001";
+const UPLOAD_ENDPOINT = `${BACKEND_URL.replace(/\/$/, "")}/api/render/upload`;
 // Default JWT provided by the backend for uploads during development
 const DEFAULT_UPLOAD_TOKEN =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzUxOTc3NDEyfQ.ZMgBWPhRw4amD-AOk1yBqKqzUCnVCje9u_qscAdKIzA";
@@ -25,10 +29,11 @@ export const uploadFile = async (
   const formData = new FormData();
   formData.append("file", file, file.name);
 
-  const authHeader =
-    token || DEFAULT_UPLOAD_TOKEN
-      ? { Authorization: `Bearer ${token ?? DEFAULT_UPLOAD_TOKEN}` }
-      : undefined;
+  const effectiveToken = token ?? getAuthToken() ?? DEFAULT_UPLOAD_TOKEN;
+
+  const authHeader = effectiveToken
+    ? { Authorization: `Bearer ${effectiveToken}` }
+    : undefined;
 
   const res = await fetch(UPLOAD_ENDPOINT, {
     method: "POST",

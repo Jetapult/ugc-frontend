@@ -1,28 +1,23 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { dispatch } from "@designcombo/events";
-import { HISTORY_UNDO, HISTORY_REDO, DESIGN_RESIZE } from "@designcombo/state";
+import { HISTORY_UNDO, HISTORY_REDO, DESIGN_RESIZE, ADD_VIDEO } from "@designcombo/state";
 import { Icons } from "@/components/shared/icons";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ChevronDown, Download, MenuIcon, ShareIcon } from "lucide-react";
+import { ChevronDown, Download, PlusIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type StateManager from "@designcombo/state";
 import { generateId } from "@designcombo/timeline";
-import { IDesign } from "@designcombo/types";
+import { IDesign, IVideo } from "@designcombo/types";
 import { useDownloadState } from "./store/use-download-state";
 import DownloadProgressModal from "./download-progress-modal";
 import AutosizeInput from "@/components/ui/autosize-input";
 import { debounce } from "lodash";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar({
   stateManager,
@@ -34,7 +29,64 @@ export default function Navbar({
   setProjectName: (name: string) => void;
   projectName: string;
 }) {
+  const { logout } = useAuth();
   const [title, setTitle] = useState(projectName);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleAddFiles = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    for (const file of files) {
+      if (!file.type.startsWith("video/")) {
+        console.log("Not a video");
+        continue;
+      }
+
+      const objectUrl = URL.createObjectURL(file);
+
+      // Upload to backend to obtain public URL
+      let publicUrl: string;
+      try {
+        const { uploadFile } = await import("@/utils/upload");
+        publicUrl = await uploadFile(file);
+      } catch (err) {
+        console.error("Failed to upload file", err);
+        URL.revokeObjectURL(objectUrl);
+        continue;
+      }
+
+      const videoEl = document.createElement("video");
+      videoEl.preload = "metadata";
+      videoEl.src = objectUrl;
+      videoEl.onloadedmetadata = () => {
+        const payload: Partial<IVideo> = {
+          id: generateId(),
+          type: "video",
+          duration: videoEl.duration * 1000,
+          details: {
+            src: publicUrl,
+            width: videoEl.videoWidth,
+            height: videoEl.videoHeight,
+          } as any,
+          metadata: {
+            previewUrl: objectUrl,
+            name: file.name,
+          },
+        };
+
+        dispatch(ADD_VIDEO, {
+          payload,
+          options: {
+            resourceId: "main",
+            scaleMode: "fit",
+          },
+        });
+      };
+    }
+  };
 
   const handleUndo = () => {
     dispatch(HISTORY_UNDO);
@@ -75,32 +127,6 @@ export default function Navbar({
       <DownloadProgressModal />
 
       <div className="flex items-center gap-2">
-        <div className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-md text-zinc-200">
-          <DropdownMenu>
-            <DropdownMenuTrigger>
-              <div className="hover:bg-background-subtle flex h-8 w-8 items-center justify-center">
-                <MenuIcon className="h-5 w-5" />
-              </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="z-[300] w-56 p-2" align="start">
-              <DropdownMenuItem
-                onClick={handleCreateProject}
-                className="cursor-pointer text-muted-foreground"
-              >
-                New project
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer text-muted-foreground">
-                My projects
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={handleCreateProject}
-                className="cursor-pointer text-muted-foreground"
-              >
-                Duplicate project
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
         <div className="bg-sidebar pointer-events-auto flex h-12 items-center px-1.5">
           <Button
             onClick={handleUndo}
@@ -118,6 +144,7 @@ export default function Navbar({
           >
             <Icons.redo width={20} />
           </Button>
+
         </div>
       </div>
 
@@ -135,22 +162,29 @@ export default function Navbar({
 
       <div className="flex h-14 items-center justify-end gap-2">
         <div className="bg-sidebar pointer-events-auto flex h-12 items-center gap-2 rounded-md px-2.5">
+          <DownloadPopover stateManager={stateManager} />
           <Button
+            onClick={handleAddFiles}
             className="flex h-8 gap-1 border border-border"
             variant="outline"
           >
-            <ShareIcon width={18} /> Share
+            <PlusIcon width={18} /> Add file
           </Button>
-          <DownloadPopover stateManager={stateManager} />
           <Button
-            className="flex h-8 gap-1 border border-border"
-            variant="default"
-            onClick={() => {
-              window.open("https://discord.gg/jrZs3wZyM5", "_blank");
-            }}
+            onClick={logout}
+            className="flex h-8 gap-1 border border-border text-red-400 hover:bg-red-500/10"
+            variant="outline"
           >
-            Discord
+            Logout
           </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,video/*,audio/*"
+            className="hidden"
+            onChange={handleFilesSelected}
+          />
         </div>
       </div>
     </div>

@@ -50,6 +50,7 @@ export type Icon = LucideIcon;
 export const Icons = {
   add: Plus,
   audio: MusicIcon,
+  fileText: FileText,
   arrowRight: ArrowRight,
   arrowUpRight: ArrowUpRight,
   billing: CreditCard,

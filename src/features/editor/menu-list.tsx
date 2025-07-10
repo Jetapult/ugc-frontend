@@ -72,6 +72,21 @@ export default function MenuList() {
       </Button> */}
       <Button
         onClick={() => {
+          setActiveMenuItem("script");
+          setShowMenuItem(true);
+        }}
+        className={cn(
+          showMenuItem && activeMenuItem === "script"
+            ? "bg-secondary"
+            : "text-muted-foreground",
+        )}
+        variant={"ghost"}
+        size={"icon"}
+      >
+        <Icons.fileText width={16} />
+      </Button>
+      <Button
+        onClick={() => {
           setActiveMenuItem("audios");
           setShowMenuItem(true);
         }}
