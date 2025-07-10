@@ -5,6 +5,7 @@ import { PlusIcon } from "lucide-react";
 import { uploadFile } from "@/utils/upload";
 import { dispatch } from "@designcombo/events";
 import { useAuth } from "@/context/AuthContext";
+import AvatarPickerDialog from "@/components/heygen/avatar-picker-dialog";
 import { ADD_VIDEO } from "@designcombo/state";
 import { generateId } from "@designcombo/timeline";
 import type { IVideo } from "@designcombo/types";
@@ -13,6 +14,8 @@ import type StateManager from "@designcombo/state";
 const BACKEND_URL = (import.meta as any).env?.BACKEND_URL || "http://localhost:8001";
 const GENERATE_ENDPOINT = `${BACKEND_URL.replace(/\/$/, "")}/api/heygen/generate_script`;
 
+import VoicePickerDialog from "../../components/heygen/voice-picker-dialog";
+
 const ScriptMenu: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [videoUploaded, setVideoUploaded] = useState(false);
@@ -20,6 +23,13 @@ const ScriptMenu: React.FC = () => {
   const [context, setContext] = useState("");
   const [generating, setGenerating] = useState(false);
   const [script, setScript] = useState<string | null>(null);
+  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
+  const [voiceDialogOpen, setVoiceDialogOpen] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState<{
+    voice_id: string;
+    name: string;
+  } | null>(null);
+  const [selectedAvatar, setSelectedAvatar] = useState<any>(null);
   const { token } = useAuth();
 
   const handleUploadClick = () => fileInputRef.current?.click();
@@ -135,9 +145,29 @@ const ScriptMenu: React.FC = () => {
             className="min-h-[140px] text-xs w-full"
           />
           <div className="grid grid-cols-2 gap-2 mt-2 w-full">
-            <Button variant="secondary" className="w-full">Select avatar</Button>
-            <Button variant="secondary" className="w-full">Select voice</Button>
+            <Button variant="secondary" className="w-full" onClick={() => setAvatarDialogOpen(true)}>
+              {selectedAvatar ? "Change avatar" : "Select avatar"}
+            </Button>
+            <Button variant="secondary" className="w-full" onClick={() => setVoiceDialogOpen(true)}>
+                {selectedVoice ? "Change voice" : "Select voice"}
+              </Button>
           </div>
+          {selectedVoice && (
+            <p className="mt-1 text-xs text-muted-foreground">Selected voice: <span className="font-medium text-foreground">{selectedVoice.name}</span></p>
+          )}
+          {selectedAvatar && (
+            <p className="mt-1 text-xs text-muted-foreground">Selected avatar: <span className="font-medium text-foreground">{selectedAvatar.avatar_name}</span></p>
+          )}
+          <AvatarPickerDialog
+            open={avatarDialogOpen}
+            onOpenChange={setAvatarDialogOpen}
+            onSelect={(a) => setSelectedAvatar(a)}
+          />
+          <VoicePickerDialog
+            open={voiceDialogOpen}
+            onOpenChange={setVoiceDialogOpen}
+            onSelect={(v) => setSelectedVoice({ voice_id: v.voice_id, name: v.name })}
+          />
         </>
       )}
     </div>
