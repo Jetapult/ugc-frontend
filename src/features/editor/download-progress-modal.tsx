@@ -6,7 +6,7 @@ import { DialogDescription, DialogTitle } from "@radix-ui/react-dialog";
 import { download } from "@/utils/download";
 
 const DownloadProgressModal = () => {
-  const { progress, displayProgressModal, output, actions } =
+  const { progress, displayProgressModal, output, actions, status, renderedFrames, encodedFrames, frameCount } =
     useDownloadState();
   const isCompleted = progress === 100;
 
@@ -49,12 +49,23 @@ const DownloadProgressModal = () => {
             <div className="text-5xl font-semibold">
               {Math.floor(progress)}%
             </div>
-            <div className="font-bold">Exporting...</div>
+            <div className="font-bold">Exporting... {status && `(${status})`}</div>
+            {frameCount > 0 && (
+              <div className="text-center text-sm text-muted-foreground space-y-1">
+                <div>Rendered {renderedFrames} of {frameCount} frames</div>
+                <div>Encoded {encodedFrames} of {frameCount} frames</div>
+              </div>
+            )}
             <div className="text-center text-zinc-500">
               <div>Closing the browser will not cancel the export.</div>
               <div>The video will be saved in your space.</div>
             </div>
-            <Button variant={"outline"}>Cancel</Button>
+            <Button 
+              variant={"outline"}
+              onClick={() => actions.setDisplayProgressModal(false)}
+            >
+              Cancel
+            </Button>
           </div>
         )}
       </DialogContent>

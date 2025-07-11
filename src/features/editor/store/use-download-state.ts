@@ -1,16 +1,24 @@
 import { IDesign } from "@designcombo/types";
 import { create } from "zustand";
+import { getAuthToken } from "@/context/AuthContext";
 
 interface Output {
   url: string;
   type: string;
 }
 
+// For canceling polling timeouts
+let pollingTimeoutId: NodeJS.Timeout | null = null;
+
 interface DownloadState {
   projectId: string;
   exporting: boolean;
   exportType: "json" | "mp4" | "webm";
   progress: number;
+  status: string;
+  renderedFrames: number;
+  encodedFrames: number;
+  frameCount: number;
   output?: Output;
   payload?: IDesign;
   displayProgressModal: boolean;
@@ -26,12 +34,24 @@ interface DownloadState {
   };
 }
 
+// Default JWT provided by the backend for rendering during development
+const DEFAULT_RENDER_TOKEN =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzUxOTc3NDEyfQ.ZMgBWPhRw4amD-AOk1yBqKqzUCnVCje9u_qscAdKIzA";
+
+const BACKEND_URL =
+  (import.meta as any).env?.BACKEND_URL || "http://localhost:8001";
+const RENDER_ENDPOINT = `${BACKEND_URL.replace(/\/$/, "")}/api/render`;
+
 export const useDownloadState = create<DownloadState>((set, get) => ({
   projectId: "",
   exporting: false,
   exportType: "mp4", // default
 
   progress: 0,
+  status: "",
+  renderedFrames: 0,
+  encodedFrames: 0,
+  frameCount: 0,
   displayProgressModal: false,
   actions: {
     setProjectId: (projectId) => set({ projectId }),
@@ -40,12 +60,25 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
     setProgress: (progress) => set({ progress }),
     setState: (state) => set({ ...state }),
     setOutput: (output) => set({ output }),
-    setDisplayProgressModal: (displayProgressModal) =>
-      set({ displayProgressModal }),
+    setDisplayProgressModal: (displayProgressModal) => {
+      // If closing the modal, cancel any ongoing polling
+      if (!displayProgressModal && pollingTimeoutId) {
+        clearTimeout(pollingTimeoutId);
+        pollingTimeoutId = null;
+      }
+      set({ displayProgressModal });
+    },
     startExport: async () => {
       try {
         // Set exporting to true at the start
-        set({ exporting: true, displayProgressModal: true });
+        set({
+          exporting: true,
+          displayProgressModal: true,
+          status: "PREPARING",
+          renderedFrames: 0,
+          encodedFrames: 0,
+          frameCount: 0,
+        });
 
         // Assume payload to be stored in the state for POST request
         const { payload } = get();
@@ -53,12 +86,16 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
         if (!payload) throw new Error("Payload is not defined");
 
         // Step 1: POST request to start rendering
-        const response = await fetch("http://localhost:8001/api/render", {
+        const effectiveToken = getAuthToken() ?? DEFAULT_RENDER_TOKEN;
+        const authHeader = effectiveToken
+          ? { Authorization: `Bearer ${effectiveToken}` }
+          : undefined;
+
+        const response = await fetch(RENDER_ENDPOINT, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization:
-              "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzUxOTc3NDEyfQ.ZMgBWPhRw4amD-AOk1yBqKqzUCnVCje9u_qscAdKIzA",
+            ...authHeader,
           },
           body: JSON.stringify({
             design: payload,
@@ -78,25 +115,56 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
 
         // Step 2 & 3: Polling for status updates
         const checkStatus = async () => {
-          // const statusResponse = await fetch(
-          //   `/api/render?id=${videoId}&type=VIDEO_RENDERING`,
-          // );
-          // if (!statusResponse.ok)
-          //   throw new Error("Failed to fetch export status.");
-          // const statusInfo = await statusResponse.json();
-          // const { status, progress, url } = statusInfo.video;
-          // set({ progress });
-          // if (status === "COMPLETED") {
-          //   set({ exporting: false, output: { url, type: get().exportType } });
-          // } else if (status === "PENDING") {
-          //   setTimeout(checkStatus, 2500);
-          // }
+          const statusResponse = await fetch(
+            `${RENDER_ENDPOINT}/?id=${videoId}`,
+            {
+              headers: {
+                ...authHeader,
+                accept: "application/json",
+              },
+            },
+          );
+
+          if (!statusResponse.ok)
+            throw new Error("Failed to fetch export status.");
+
+          const statusInfo = await statusResponse.json();
+          const { status, progress, url, error, renderedFrames, encodedFrames, frameCount } = statusInfo.video;
+
+          // Update progress, status, and frame information in the UI
+          set({ 
+            progress: progress || 0, 
+            status: status || "",
+            renderedFrames: renderedFrames || 0,
+            encodedFrames: encodedFrames || 0,
+            frameCount: frameCount || 0
+          });
+
+          if (status === "COMPLETED" && url) {
+            // Export completed successfully
+            set({ exporting: false, output: { url, type: get().exportType } });
+          } else if (status === "FAILED" || error) {
+            // Handle error case
+            console.error("Export failed:", error);
+            set({ exporting: false });
+            // Could show an error message to the user here
+          } else if (status === "PENDING" || status === "IN_PROGRESS") {
+            // Continue polling (but store the timeout ID so we can cancel it)
+            if (pollingTimeoutId) clearTimeout(pollingTimeoutId);
+            pollingTimeoutId = setTimeout(checkStatus, 2000); // Poll every 2 seconds
+          }
         };
 
+        // Start the polling
         checkStatus();
       } catch (error) {
         console.error(error);
         set({ exporting: false });
+        // Clear any polling on error
+        if (pollingTimeoutId) {
+          clearTimeout(pollingTimeoutId);
+          pollingTimeoutId = null;
+        }
       }
     },
   },
