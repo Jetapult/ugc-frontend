@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, Loader2 } from "lucide-react";
 import { uploadFile } from "@/utils/upload";
 import { dispatch } from "@designcombo/events";
 import { useAuth } from "@/context/AuthContext";
@@ -11,10 +11,12 @@ import { generateId } from "@designcombo/timeline";
 import type { IVideo } from "@designcombo/types";
 import type StateManager from "@designcombo/state";
 
-const BACKEND_URL = (import.meta as any).env?.BACKEND_URL || "http://localhost:8001";
+const BACKEND_URL =
+  (import.meta as any).env?.BACKEND_URL || "http://localhost:8001";
 const GENERATE_ENDPOINT = `${BACKEND_URL.replace(/\/$/, "")}/api/heygen/generate_script`;
 
 import VoicePickerDialog from "../../components/heygen/voice-picker-dialog";
+import { Input } from "../../components/ui/input";
 
 const ScriptMenu: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -30,11 +32,25 @@ const ScriptMenu: React.FC = () => {
     name: string;
   } | null>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<any>(null);
+  const [width, setWidth] = useState(1280);
+  const [height, setHeight] = useState(720);
+  const [creating, setCreating] = useState(false);
+  const [videoId, setVideoId] = useState<string | null>(null);
+  const [videoStatus, setVideoStatus] = useState<
+    "idle" | "processing" | "completed" | "error" | "pending"
+  >("idle");
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoAdded, setVideoAdded] = useState(false);
+  const [resumeVideoId, setResumeVideoId] = useState("");
+  // track auto-download & timeline insertion phases
+  const [addPhase, setAddPhase] = useState<"idle" | "downloading" | "adding" | "done">("idle");
   const { token } = useAuth();
 
   const handleUploadClick = () => fileInputRef.current?.click();
 
-  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilesSelected = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const files = Array.from(e.target.files || []);
     const file = files[0];
     if (!file || !file.type.startsWith("video/")) return;
@@ -78,8 +94,77 @@ const ScriptMenu: React.FC = () => {
     };
   };
 
+  // Poll video processing status
+  useEffect(() => {
+    if (videoStatus !== "processing" || !videoId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `${BACKEND_URL.replace(/\/$/, "")}/api/heygen/videos/${videoId}/status`,
+          {
+            headers: {
+              accept: "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          },
+        );
+        if (!res.ok) throw new Error("Status fetch failed");
+        const statusJson = await res.json();
+        const status = statusJson?.data?.status;
+        if (status === "completed") {
+          setVideoStatus("completed");
+          setVideoUrl(statusJson?.data?.video_url || "");
+        } else if (status && status !== "processing") {
+          // setVideoStatus("error");
+          console.log("Video processing failed", status);
+        }
+      } catch {
+        setVideoStatus("error");
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [videoStatus, videoId, token]);
+
+  // When video completes, auto download and add to editor once
+  useEffect(() => {
+    if (videoStatus === "completed" && videoUrl && !videoAdded) {
+      // Phase 1: downloading (triggering browser download)
+      setAddPhase("downloading");
+      try {
+        const a = document.createElement("a");
+        a.href = videoUrl;
+        a.download = `heygen-${videoId ?? Date.now()}.mp4`;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (err) {
+        console.warn("Auto download failed", err);
+        setAddPhase("done");
+      }
+
+      // Phase 2: add to timeline
+      setAddPhase("adding");
+      const payload: IVideo = {
+        id: generateId(),
+        type: "video",
+        src: videoUrl,
+        metadata: {
+          previewUrl: videoUrl,
+          name: `heygen-${videoId ?? "video"}.mp4`,
+        },
+      } as any;
+      dispatch(ADD_VIDEO, {
+        payload,
+        options: { resourceId: "main", scaleMode: "fit" },
+      });
+      setVideoAdded(true);
+      setAddPhase("done");
+    }
+  }, [videoStatus, videoUrl, videoAdded, videoId]);
+
   return (
-    <div className="flex flex-col gap-3 p-4 text-sm w-full">
+    <div className="flex w-full flex-col gap-3 overflow-auto p-4 text-sm">
       <Button
         className="flex gap-1 border border-border"
         variant="outline"
@@ -123,7 +208,8 @@ const ScriptMenu: React.FC = () => {
                   throw new Error(`Generate failed: ${res.status}`);
                 }
                 const data = await res.json().catch(() => null);
-                const text = data?.script ?? data?.text ?? data ?? (await res.text());
+                const text =
+                  data?.script ?? data?.text ?? data ?? (await res.text());
                 setScript(String(text));
               } catch (err) {
                 console.error(err);
@@ -142,21 +228,60 @@ const ScriptMenu: React.FC = () => {
           <Textarea
             value={script}
             onChange={(e) => setScript(e.target.value)}
-            className="min-h-[140px] text-xs w-full"
+            className="min-h-[140px] w-full text-xs"
           />
-          <div className="grid grid-cols-2 gap-2 mt-2 w-full">
-            <Button variant="secondary" className="w-full" onClick={() => setAvatarDialogOpen(true)}>
+          <div className="mt-2 grid w-full grid-cols-2 gap-2">
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={() => setAvatarDialogOpen(true)}
+            >
               {selectedAvatar ? "Change avatar" : "Select avatar"}
             </Button>
-            <Button variant="secondary" className="w-full" onClick={() => setVoiceDialogOpen(true)}>
-                {selectedVoice ? "Change voice" : "Select voice"}
-              </Button>
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={() => setVoiceDialogOpen(true)}
+            >
+              {selectedVoice ? "Change voice" : "Select voice"}
+            </Button>
           </div>
+          <div className="mt-1 flex flex-col gap-2">
+            <p className="text-xs text-muted-foreground">Resolution</p>
+            <div className="flex w-full items-center gap-2">
+              <Input
+                type="number"
+                value={width}
+                onChange={(e) => setWidth(Number(e.target.value))}
+                className="flex-1"
+                min={1}
+              />
+              <span className="text-sm">x</span>
+              <Input
+                type="number"
+                value={height}
+                onChange={(e) => setHeight(Number(e.target.value))}
+                className="flex-1"
+                min={1}
+              />
+            </div>
+          </div>
+
           {selectedVoice && (
-            <p className="mt-1 text-xs text-muted-foreground">Selected voice: <span className="font-medium text-foreground">{selectedVoice.name}</span></p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Selected voice:{" "}
+              <span className="font-medium text-foreground">
+                {selectedVoice.name}
+              </span>
+            </p>
           )}
           {selectedAvatar && (
-            <p className="mt-1 text-xs text-muted-foreground">Selected avatar: <span className="font-medium text-foreground">{selectedAvatar.avatar_name}</span></p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Selected avatar:{" "}
+              <span className="font-medium text-foreground">
+                {selectedAvatar.avatar_name}
+              </span>
+            </p>
           )}
           <AvatarPickerDialog
             open={avatarDialogOpen}
@@ -166,8 +291,141 @@ const ScriptMenu: React.FC = () => {
           <VoicePickerDialog
             open={voiceDialogOpen}
             onOpenChange={setVoiceDialogOpen}
-            onSelect={(v) => setSelectedVoice({ voice_id: v.voice_id, name: v.name })}
+            onSelect={(v) =>
+              setSelectedVoice({ voice_id: v.voice_id, name: v.name })
+            }
           />
+          {selectedAvatar &&
+            selectedVoice &&
+            ((videoStatus === "processing" || (videoStatus === "completed" && !videoAdded)) ? (
+              <div className="mt-3 flex w-full flex-col items-center gap-1">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <p className="text-xs text-muted-foreground">
+                  {videoStatus === "processing"
+                    ? `Current Status: ${videoStatus}. this can take a few minutes`
+                    : addPhase === "downloading"
+                    ? "Downloading processed video…"
+                    : addPhase === "adding"
+                    ? "Adding video to timeline…"
+                    : "Finalizing…"}
+                </p>
+              </div>
+            ) : (videoStatus === "completed" && videoUrl && videoAdded) ? (
+              <Button asChild className="mt-3 w-full" variant="default">
+                <a
+                  href={videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                >
+                  Download video
+                </a>
+              </Button>
+            ) : (
+              <Button
+                className="mt-3 w-full"
+                variant="default"
+                disabled={creating || !script}
+                onClick={async () => {
+                  if (!selectedAvatar || !selectedVoice || !script) return;
+                  setVideoStatus("processing");
+                  setVideoAdded(false);
+                  setCreating(true);
+
+                  try {
+                    const res = await fetch(
+                      `${BACKEND_URL.replace(/\/$/, "")}/api/heygen/videos/`,
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          accept: "application/json",
+                          ...(token
+                            ? { Authorization: `Bearer ${token}` }
+                            : {}),
+                        },
+                        body: JSON.stringify({
+                          avatar_pose_id:
+                            selectedAvatar.avatar_id ??
+                            selectedAvatar.avatar_pose_id ??
+                            selectedAvatar.avatarId ??
+                            selectedAvatar.avatar_id,
+                          avatar_style: "normal",
+                          input_text: script,
+                          voice_id: selectedVoice.voice_id,
+                          width,
+                          height,
+                        }),
+                      },
+                    );
+                    if (!res.ok)
+                      throw new Error(`Create video failed: ${res.status}`);
+                    const data = await res.json().catch(() => null);
+                    const vid = data?.data?.video_id;
+                    if (!vid) throw new Error("Missing video_id in response");
+                    console.log("Video created", vid);
+                    setVideoId(vid);
+                    setVideoStatus("processing");
+                    setVideoUrl(null);
+                  } catch (err: any) {
+                    alert(err.message ?? "Error");
+                  } finally {
+                    setCreating(false);
+                  }
+                }}
+              >
+                {creating ? "Creating…" : "Create video"}
+              </Button>
+            ))}
+          {selectedAvatar && selectedVoice && (
+            <div className="mt-2 flex w-full gap-2">
+              <Input
+                placeholder="Existing video ID"
+                value={resumeVideoId}
+                onChange={(e) => setResumeVideoId(e.target.value)}
+              />
+              <Button
+                variant="secondary"
+                disabled={!resumeVideoId}
+                onClick={() => {
+                  if (!resumeVideoId) return;
+                  setVideoId(resumeVideoId.trim());
+                  setVideoStatus("processing");
+                  setVideoUrl(null);
+                  setVideoAdded(false);
+                }}
+              >
+                Resume
+              </Button>
+            </div>
+          )}
+          {(videoStatus === "processing" || (videoStatus === "completed" && !videoAdded)) ? (
+            <div className="mt-3 flex w-full flex-col items-center gap-1">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">
+                {videoStatus === "processing"
+                  ? `Current Status: ${videoStatus}. this can take a few minutes`
+                  : addPhase === "downloading"
+                  ? "Downloading processed video…"
+                  : addPhase === "adding"
+                  ? "Adding video to timeline…"
+                  : "Finalizing…"}
+              </p>
+            </div>
+          ) : (videoStatus === "completed" && videoUrl && videoAdded) ? (
+            <Button asChild className="mt-3 w-full" variant="default">
+              <a
+                href={videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+              >
+                Download video
+              </a>
+            </Button>
+          ) : (
+            <></>
+          )}
         </>
       )}
     </div>
