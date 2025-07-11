@@ -10,6 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 
 interface AvatarItem {
   avatar_id: string;
@@ -26,9 +27,6 @@ interface Props {
   onSelect?: (avatar: AvatarItem) => void;
 }
 
-const BACKEND_URL =
-  (import.meta as any).env?.BACKEND_URL || "http://localhost:8001";
-const AVATAR_ENDPOINT = `${BACKEND_URL.replace(/\/$/, "")}/api/heygen/avatars`;
 
 const pageLimit = 10;
 
@@ -50,21 +48,16 @@ const AvatarPickerDialog: React.FC<Props> = ({
   const fetchAvatars = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
+      const params = {
         limit: String(pageLimit),
         offset: String(offset),
-      });
-      if (search) params.append("search", search);
-      if (gender) params.append("gender", gender);
-      if (premium) params.append("premium", premium);
-      const res = await fetch(`${AVATAR_ENDPOINT}?${params.toString()}`, {
-        headers: {
-          accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      if (!res.ok) throw new Error(`Failed ${res.status}`);
-      const data = await res.json();
+        ...(search ? { search } : {}),
+        ...(gender ? { gender } : {}),
+        ...(premium ? { premium } : {}),
+      } as Record<string, string | number | boolean>;
+
+      const data: any = await api.heygen.avatars(params);
+
       setItems(data.items || []);
       setTotal(data.total || 0);
     } catch (err) {
@@ -72,7 +65,7 @@ const AvatarPickerDialog: React.FC<Props> = ({
     } finally {
       setLoading(false);
     }
-  }, [offset, search, gender, premium, token]);
+  }, [offset, search, gender, premium]);
 
   useEffect(() => {
     if (open) fetchAvatars();

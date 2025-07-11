@@ -1,6 +1,6 @@
 import { IDesign } from "@designcombo/types";
 import { create } from "zustand";
-import { getAuthToken } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 
 interface Output {
   url: string;
@@ -34,13 +34,9 @@ interface DownloadState {
   };
 }
 
-// Default JWT provided by the backend for rendering during development
-const DEFAULT_RENDER_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzUxOTc3NDEyfQ.ZMgBWPhRw4amD-AOk1yBqKqzUCnVCje9u_qscAdKIzA";
 
-const BACKEND_URL =
-  (import.meta as any).env?.BACKEND_URL || "http://localhost:8001";
-const RENDER_ENDPOINT = `${BACKEND_URL.replace(/\/$/, "")}/api/render`;
+
+
 
 export const useDownloadState = create<DownloadState>((set, get) => ({
   projectId: "",
@@ -85,50 +81,22 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
 
         if (!payload) throw new Error("Payload is not defined");
 
-        // Step 1: POST request to start rendering
-        const effectiveToken = getAuthToken() ?? DEFAULT_RENDER_TOKEN;
-        const authHeader = effectiveToken
-          ? { Authorization: `Bearer ${effectiveToken}` }
-          : undefined;
-
-        const response = await fetch(RENDER_ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...authHeader,
+        // Step 1: POST request to start rendering via central API layer
+        const jobInfo: any = await api.render.create({
+          design: payload,
+          options: {
+            fps: 30,
+            size: payload.size,
+            format: get().exportType === "webm" ? "webm" : "mp4",
+            transparent: get().exportType === "webm",
           },
-          body: JSON.stringify({
-            design: payload,
-            options: {
-              fps: 30,
-              size: payload.size,
-              format: get().exportType === "webm" ? "webm" : "mp4",
-              transparent: get().exportType === "webm",
-            },
-          }),
         });
-
-        if (!response.ok) throw new Error("Failed to submit export request.");
-
-        const jobInfo = await response.json();
         const videoId = jobInfo.video.id;
 
         // Step 2 & 3: Polling for status updates
         const checkStatus = async () => {
-          const statusResponse = await fetch(
-            `${RENDER_ENDPOINT}/?id=${videoId}`,
-            {
-              headers: {
-                ...authHeader,
-                accept: "application/json",
-              },
-            },
-          );
+          const statusInfo: any = await api.render.status(videoId);
 
-          if (!statusResponse.ok)
-            throw new Error("Failed to fetch export status.");
-
-          const statusInfo = await statusResponse.json();
           const { status, progress, url, error, renderedFrames, encodedFrames, frameCount } = statusInfo.video;
 
           // Update progress, status, and frame information in the UI

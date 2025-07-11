@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { PlusIcon, Loader2 } from "lucide-react";
 import { uploadFile } from "@/utils/upload";
+import { api } from "@/lib/api";
 import { dispatch } from "@designcombo/events";
 import { useAuth } from "@/context/AuthContext";
 import AvatarPickerDialog from "@/components/heygen/avatar-picker-dialog";
@@ -16,12 +17,6 @@ declare global {
 }
 import { generateId } from "@designcombo/timeline";
 import type { IVideo } from "@designcombo/types";
-import type StateManager from "@designcombo/state";
-
-const BACKEND_URL =
-  (import.meta as any).env?.BACKEND_URL || "http://localhost:8001";
-const GENERATE_ENDPOINT = `${BACKEND_URL.replace(/\/$/, "")}/api/heygen/generate_script`;
-
 import VoicePickerDialog from "../../components/heygen/voice-picker-dialog";
 import { Input } from "../../components/ui/input";
 
@@ -110,17 +105,7 @@ const ScriptMenu: React.FC = () => {
     if (videoStatus !== "processing" || !videoId) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(
-          `${BACKEND_URL.replace(/\/$/, "")}/api/heygen/videos/${videoId}/status`,
-          {
-            headers: {
-              accept: "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-          },
-        );
-        if (!res.ok) throw new Error("Status fetch failed");
-        const statusJson = await res.json();
+        const statusJson: any = await api.heygen.videos.status(videoId);
         const status = statusJson?.data?.status;
         if (status === "completed") {
           setVideoStatus("completed");
@@ -250,21 +235,9 @@ const ScriptMenu: React.FC = () => {
               if (!uploadedUrl) return;
               setGenerating(true);
               try {
-                const res = await fetch(GENERATE_ENDPOINT, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    accept: "application/json",
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                  },
-                  body: JSON.stringify({ url: uploadedUrl, context }),
-                });
-                if (!res.ok) {
-                  throw new Error(`Generate failed: ${res.status}`);
-                }
-                const data = await res.json().catch(() => null);
-                const text =
-                  data?.script ?? data?.text ?? data ?? (await res.text());
+
+                const data: any = await api.heygen.generateScript({ url: uploadedUrl, context });
+                const text = data?.script ?? data?.text ?? data;
                 setScript(String(text));
               } catch (err) {
                 console.error(err);
@@ -391,35 +364,19 @@ const ScriptMenu: React.FC = () => {
                   setCreating(true);
 
                   try {
-                    const res = await fetch(
-                      `${BACKEND_URL.replace(/\/$/, "")}/api/heygen/videos/`,
-                      {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                          accept: "application/json",
-                          ...(token
-                            ? { Authorization: `Bearer ${token}` }
-                            : {}),
-                        },
-                        body: JSON.stringify({
-                          avatar_pose_id:
-                            selectedAvatar.avatar_id ??
-                            selectedAvatar.avatar_pose_id ??
-                            selectedAvatar.avatarId ??
-                            selectedAvatar.avatar_id,
-                          avatar_style: "normal",
-                          input_text: script,
-                          voice_id: selectedVoice.voice_id,
-                          width,
-                          height,
-                        }),
-                      },
-                    );
-                    if (!res.ok)
-                      throw new Error(`Create video failed: ${res.status}`);
-                    const data = await res.json().catch(() => null);
-                    const vid = data?.data?.video_id;
+                    const data: any = await api.heygen.videos.create({
+                      avatar_pose_id:
+                        selectedAvatar.avatar_id ??
+                        selectedAvatar.avatar_pose_id ??
+                        selectedAvatar.avatarId ??
+                        selectedAvatar.avatar_id,
+                      avatar_style: "normal",
+                      input_text: script,
+                      voice_id: selectedVoice.voice_id,
+                      width,
+                      height,
+                    });
+                    const vid = data?.data?.video_id ?? data?.video_id;
                     if (!vid) throw new Error("Missing video_id in response");
                     console.log("Video created", vid);
                     setVideoId(vid);

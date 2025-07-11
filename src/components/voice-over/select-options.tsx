@@ -23,6 +23,7 @@ import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "../ui/scroll-area";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { api } from "@/lib/api";
 
 type SliderProps = React.ComponentProps<typeof Slider>;
 
@@ -50,6 +51,8 @@ type ModelSliderOptionsProps = Omit<SliderProps, "value" | "onValueChange"> & {
   handleChange: (value: number) => void;
   type?: string;
 };
+
+
 
 export function SelectGender({ onGenderChange, gender }: SelectGenderProps) {
   return (
@@ -174,14 +177,9 @@ export function SelectSpeaker({ setVoiceId }: PropSelectSpeaker) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/voices?language=${language}`);
+        const data = await api.voices.list(language);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        setVoices(data);
+        setVoices(data as any);
       } catch (err) {
         setError("Error fetching voices");
         console.error(err);

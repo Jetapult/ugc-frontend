@@ -8,7 +8,7 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { useAuth } from "../../context/AuthContext";
+import { api } from "@/lib/api";
 
 interface VoiceItem {
   voice_id: string;
@@ -24,7 +24,7 @@ interface Props {
   onSelect?: (voice: VoiceItem) => void;
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8001";
+
 const pageLimit = 16;
 
 const VoicePickerDialog: React.FC<Props> = ({
@@ -32,7 +32,7 @@ const VoicePickerDialog: React.FC<Props> = ({
   onOpenChange,
   onSelect,
 }) => {
-  const { token } = useAuth();
+  
 
   const [items, setItems] = useState<VoiceItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -46,22 +46,15 @@ const VoicePickerDialog: React.FC<Props> = ({
   const fetchVoices = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
+      const params = {
         limit: String(pageLimit),
         offset: String(offset),
-      });
-      if (search) params.append("search", search);
-      if (gender) params.append("gender", gender);
-      if (language) params.append("language", language);
-      const url = `${BACKEND_URL}/api/heygen/voices?${params.toString()}`;
-      const res = await fetch(url, {
-        headers: {
-          accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      if (!res.ok) throw new Error(`Fetch voices failed ${res.status}`);
-      const data = await res.json();
+        ...(search ? { search } : {}),
+        ...(gender ? { gender } : {}),
+        ...(language ? { language } : {}),
+      };
+
+      const data: any = await api.heygen.voices(params);
       setItems(data.items || []);
       setTotal(data.total || 0);
     } catch (err) {
@@ -69,7 +62,7 @@ const VoicePickerDialog: React.FC<Props> = ({
     } finally {
       setLoading(false);
     }
-  }, [token, offset, search, gender, language]);
+  }, [offset, search, gender, language]);
 
   useEffect(() => {
     if (open) fetchVoices();
