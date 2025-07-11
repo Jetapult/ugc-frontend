@@ -3,17 +3,19 @@ import { useDownloadState } from "./store/use-download-state";
 import { Button } from "@/components/ui/button";
 import { CircleCheckIcon, XIcon } from "lucide-react";
 import { DialogDescription, DialogTitle } from "@radix-ui/react-dialog";
-import { download } from "@/utils/download";
+
 
 const DownloadProgressModal = () => {
   const { progress, displayProgressModal, output, actions, status, renderedFrames, encodedFrames, frameCount } =
     useDownloadState();
   const isCompleted = progress === 100;
 
-  const handleDownload = async () => {
+  const handleDownload = () => {
     if (output?.url) {
-      await download(output.url, "untitled.mp4");
-      console.log("downloading");
+      // Open the exported video URL in a new tab/window so the browser handles
+      // the file download directly. This avoids CORS issues that can occur
+      // when trying to fetch the file programmatically.
+      window.open(output.url, "_blank", "noopener,noreferrer");
     }
   };
   return (
@@ -42,6 +44,16 @@ const DownloadProgressModal = () => {
                 You can download the video to your device.
               </div>
             </div>
+            {output?.url && (
+              <a
+                href={output.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 underline break-all"
+              >
+                {output.url}
+              </a>
+            )}
             <Button onClick={handleDownload}>Download</Button>
           </div>
         ) : (

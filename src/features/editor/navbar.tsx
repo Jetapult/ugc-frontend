@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { dispatch } from "@designcombo/events";
-import { HISTORY_UNDO, HISTORY_REDO, DESIGN_RESIZE, ADD_VIDEO } from "@designcombo/state";
+import {
+  HISTORY_UNDO,
+  HISTORY_REDO,
+  DESIGN_RESIZE,
+  ADD_VIDEO,
+} from "@designcombo/state";
 import { Icons } from "@/components/shared/icons";
 import {
   Popover,
@@ -37,7 +42,9 @@ export default function Navbar({
     fileInputRef.current?.click();
   };
 
-  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilesSelected = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const files = Array.from(e.target.files || []);
     for (const file of files) {
       if (!file.type.startsWith("video/")) {
@@ -144,7 +151,6 @@ export default function Navbar({
           >
             <Icons.redo width={20} />
           </Button>
-
         </div>
       </div>
 
@@ -218,7 +224,7 @@ const DownloadPopover = ({ stateManager }: { stateManager: StateManager }) => {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="bg-zinc-900 z-[250] flex w-60 flex-col gap-4 border border-border"
+        className="z-[250] flex w-60 flex-col gap-4 border border-border bg-zinc-900"
       >
         <Label>Export settings</Label>
 
@@ -229,7 +235,7 @@ const DownloadPopover = ({ stateManager }: { stateManager: StateManager }) => {
               <ChevronDown width={16} />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="bg-zinc-900 z-[251] w-[--radix-popover-trigger-width] px-2 py-2 border border-border">
+          <PopoverContent className="z-[251] w-[--radix-popover-trigger-width] border border-border bg-zinc-900 px-2 py-2">
             <div
               className="flex h-8 items-center rounded-sm px-3 text-sm hover:cursor-pointer hover:bg-zinc-800"
               onClick={() => {
@@ -239,7 +245,7 @@ const DownloadPopover = ({ stateManager }: { stateManager: StateManager }) => {
             >
               MP4
             </div>
-            <div
+            {/* <div
               className="flex h-8 items-center rounded-sm px-3 text-sm hover:cursor-pointer hover:bg-zinc-800"
               onClick={() => {
                 actions.setExportType("webm");
@@ -247,8 +253,8 @@ const DownloadPopover = ({ stateManager }: { stateManager: StateManager }) => {
               }}
             >
               WEBM (transparent)
-            </div>
-            <div
+            </div> */}
+            {/* <div
               className="flex h-8 items-center rounded-sm px-3 text-sm hover:cursor-pointer hover:bg-zinc-800"
               onClick={() => {
                 actions.setExportType("json");
@@ -256,7 +262,7 @@ const DownloadPopover = ({ stateManager }: { stateManager: StateManager }) => {
               }}
             >
               JSON
-            </div>
+            </div> */}
           </PopoverContent>
         </Popover>
 

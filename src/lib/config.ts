@@ -7,8 +7,8 @@
 export const API_CONFIG = {
   development: "http://localhost:8001",
   // Temporary public dev host (ngrok / cloud run etc.)
-  staging: "https://windows.vadapav.art",
-  production: "https://api.example.com",
+  staging: "https://ugc.vadapav.art",
+  production: "https://ugc.vadapav.art",
 } as const;
 
 export type ApiEnv = keyof typeof API_CONFIG;
@@ -51,7 +51,8 @@ export const API_ENDPOINTS = {
   heygenVideos: "/api/heygen/videos",
 
   // Voice-over voices endpoint
-  voices: (language: string) => `/api/voices?language=${encodeURIComponent(language)}`,
+  voices: (language: string) =>
+    `/api/voices?language=${encodeURIComponent(language)}`,
 
   // Render / upload
   renderUpload: "/api/render/upload",
