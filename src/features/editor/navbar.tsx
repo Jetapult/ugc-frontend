@@ -218,7 +218,7 @@ const DownloadPopover = ({ stateManager }: { stateManager: StateManager }) => {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="bg-sidebar z-[250] flex w-60 flex-col gap-4"
+        className="bg-zinc-900 z-[250] flex w-60 flex-col gap-4 border border-border"
       >
         <Label>Export settings</Label>
 
@@ -229,7 +229,7 @@ const DownloadPopover = ({ stateManager }: { stateManager: StateManager }) => {
               <ChevronDown width={16} />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="bg-background-subtle z-[251] w-[--radix-popover-trigger-width] px-2 py-2">
+          <PopoverContent className="bg-zinc-900 z-[251] w-[--radix-popover-trigger-width] px-2 py-2 border border-border">
             <div
               className="flex h-8 items-center rounded-sm px-3 text-sm hover:cursor-pointer hover:bg-zinc-800"
               onClick={() => {
