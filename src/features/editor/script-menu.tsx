@@ -7,6 +7,13 @@ import { dispatch } from "@designcombo/events";
 import { useAuth } from "@/context/AuthContext";
 import AvatarPickerDialog from "@/components/heygen/avatar-picker-dialog";
 import { ADD_VIDEO } from "@designcombo/state";
+
+// Add interface to support video cache on window object
+declare global {
+  interface Window {
+    videoCache?: Record<string, { url: string; blob: Blob }>;
+  }
+}
 import { generateId } from "@designcombo/timeline";
 import type { IVideo } from "@designcombo/types";
 import type StateManager from "@designcombo/state";
@@ -43,7 +50,9 @@ const ScriptMenu: React.FC = () => {
   const [videoAdded, setVideoAdded] = useState(false);
   const [resumeVideoId, setResumeVideoId] = useState("");
   // track auto-download & timeline insertion phases
-  const [addPhase, setAddPhase] = useState<"idle" | "downloading" | "adding" | "done">("idle");
+  const [addPhase, setAddPhase] = useState<
+    "idle" | "downloading" | "adding" | "done"
+  >("idle");
   const { token } = useAuth();
 
   const handleUploadClick = () => fileInputRef.current?.click();
@@ -86,6 +95,8 @@ const ScriptMenu: React.FC = () => {
         },
       };
 
+      console.log(ADD_VIDEO);
+      console.log(payload);
       dispatch(ADD_VIDEO, {
         payload,
         options: { resourceId: "main", scaleMode: "fit" },
@@ -128,40 +139,84 @@ const ScriptMenu: React.FC = () => {
   // When video completes, auto download and add to editor once
   useEffect(() => {
     if (videoStatus === "completed" && videoUrl && !videoAdded) {
-      // Phase 1: downloading (triggering browser download)
+      handleAddToTimeline();
+
+      setAddPhase("done");
+      return;
+    }
+  }, [videoStatus, videoUrl, videoAdded, videoId]);
+
+  // Manually download + add to timeline on button click
+  const handleAddToTimeline = async () => {
+    if (!videoUrl || videoAdded) return;
+    try {
+      // Start download phase
       setAddPhase("downloading");
-      try {
-        const a = document.createElement("a");
-        a.href = videoUrl;
-        a.download = `heygen-${videoId ?? Date.now()}.mp4`;
-        a.style.display = "none";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } catch (err) {
-        console.warn("Auto download failed", err);
-        setAddPhase("done");
+
+      // Fetch the video file
+      const response = await fetch(videoUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download: ${response.status}`);
       }
 
-      // Phase 2: add to timeline
+      const videoBlob = await response.blob();
+      const fileName = `heygen-${videoId ?? Date.now()}.mp4`;
+
+      // Create blob URL for the video
+      const blobUrl = URL.createObjectURL(videoBlob);
+
+      // Save the blob URL globally to prevent garbage collection
+      if (!window.videoCache) {
+        window.videoCache = {};
+      }
+      window.videoCache[videoId || "current"] = {
+        url: blobUrl,
+        blob: videoBlob,
+      };
+
+      // Trigger browser download
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Now add to timeline
       setAddPhase("adding");
+
+      // Create video object for timeline
       const payload: IVideo = {
         id: generateId(),
         type: "video",
-        src: videoUrl,
+        details: {
+          src: videoUrl,
+        } as any,
         metadata: {
-          previewUrl: videoUrl,
-          name: `heygen-${videoId ?? "video"}.mp4`,
+          previewUrl: blobUrl,
+          name: fileName,
         },
       } as any;
+
+      console.log(payload);
+      // Dispatch event to add to timeline
       dispatch(ADD_VIDEO, {
         payload,
         options: { resourceId: "main", scaleMode: "fit" },
       });
+
+      // Update UI state
       setVideoAdded(true);
       setAddPhase("done");
+
+      console.log("Video added to timeline successfully");
+    } catch (err) {
+      console.error("Add to timeline failed", err);
+      alert("Failed to add video to timeline: " + (err as Error).message);
+      setAddPhase("done");
     }
-  }, [videoStatus, videoUrl, videoAdded, videoId]);
+  };
 
   return (
     <div className="flex w-full flex-col gap-3 overflow-auto p-4 text-sm">
@@ -297,20 +352,23 @@ const ScriptMenu: React.FC = () => {
           />
           {selectedAvatar &&
             selectedVoice &&
-            ((videoStatus === "processing" || (videoStatus === "completed" && !videoAdded)) ? (
+            (videoStatus === "processing" ||
+            (videoStatus === "completed" &&
+              !videoAdded &&
+              addPhase !== "done") ? (
               <div className="mt-3 flex w-full flex-col items-center gap-1">
                 <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 <p className="text-xs text-muted-foreground">
                   {videoStatus === "processing"
                     ? `Current Status: ${videoStatus}. this can take a few minutes`
                     : addPhase === "downloading"
-                    ? "Downloading processed video…"
-                    : addPhase === "adding"
-                    ? "Adding video to timeline…"
-                    : "Finalizing…"}
+                      ? "Downloading processed video…"
+                      : addPhase === "adding"
+                        ? "Adding video to timeline…"
+                        : "Finalizing…"}
                 </p>
               </div>
-            ) : (videoStatus === "completed" && videoUrl && videoAdded) ? (
+            ) : videoStatus === "completed" && videoUrl && videoAdded ? (
               <Button asChild className="mt-3 w-full" variant="default">
                 <a
                   href={videoUrl}
@@ -377,52 +435,79 @@ const ScriptMenu: React.FC = () => {
                 {creating ? "Creating…" : "Create video"}
               </Button>
             ))}
-          {selectedAvatar && selectedVoice && (
-            <div className="mt-2 flex w-full gap-2">
-              <Input
-                placeholder="Existing video ID"
-                value={resumeVideoId}
-                onChange={(e) => setResumeVideoId(e.target.value)}
-              />
-              <Button
-                variant="secondary"
-                disabled={!resumeVideoId}
-                onClick={() => {
-                  if (!resumeVideoId) return;
-                  setVideoId(resumeVideoId.trim());
-                  setVideoStatus("processing");
-                  setVideoUrl(null);
-                  setVideoAdded(false);
-                }}
-              >
-                Resume
-              </Button>
-            </div>
-          )}
-          {(videoStatus === "processing" || (videoStatus === "completed" && !videoAdded)) ? (
+
+          <Input
+            placeholder="Existing video ID"
+            value={resumeVideoId}
+            onChange={(e) => setResumeVideoId(e.target.value)}
+          />
+
+          <Button
+            variant="secondary"
+            disabled={!resumeVideoId}
+            onClick={() => {
+              if (!resumeVideoId) return;
+              setVideoId(resumeVideoId.trim());
+              setVideoStatus("processing");
+              setVideoUrl(null);
+              setVideoAdded(false);
+              setAddPhase("idle");
+            }}
+          >
+            Resume
+          </Button>
+
+          {videoStatus === "processing" ||
+          (videoStatus === "completed" &&
+            !videoAdded &&
+            addPhase !== "done") ? (
             <div className="mt-3 flex w-full flex-col items-center gap-1">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <p className="text-xs text-muted-foreground">
+              {/* <Loader2 className="h-5 w-5 animate-spin text-primary" /> */}
+              {/* <p className="text-xs text-muted-foreground">
                 {videoStatus === "processing"
                   ? `Current Status: ${videoStatus}. this can take a few minutes`
                   : addPhase === "downloading"
-                  ? "Downloading processed video…"
-                  : addPhase === "adding"
-                  ? "Adding video to timeline…"
-                  : "Finalizing…"}
-              </p>
+                    ? "Downloading processed video…"
+                    : addPhase === "adding"
+                      ? "Adding video to timeline…"
+                      : "Finalizing…"}
+              </p> */}
             </div>
-          ) : (videoStatus === "completed" && videoUrl && videoAdded) ? (
-            <Button asChild className="mt-3 w-full" variant="default">
-              <a
-                href={videoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                download
+          ) : videoStatus === "completed" &&
+            videoUrl &&
+            !videoAdded &&
+            addPhase === "done" ? (
+            <div className="mt-3 flex w-full gap-2">
+              <Button asChild variant="secondary" className="flex-1">
+                <a
+                  href={videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                >
+                  Download
+                </a>
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleAddToTimeline}
+                variant="default"
               >
-                Download video
-              </a>
-            </Button>
+                Add to timeline
+              </Button>
+            </div>
+          ) : videoStatus === "completed" && videoUrl && videoAdded ? (
+            // <Button asChild className="mt-3 w-full" variant="default">
+            //   <a
+            //     href={videoUrl}
+            //     target="_blank"
+            //     rel="noopener noreferrer"
+            //     download
+            //   >
+            //     Download video
+            //   </a>
+            // </Button>
+            <div></div>
           ) : (
             <></>
           )}
