@@ -5,7 +5,7 @@
 
 // Base URLs for each environment. Extend / tweak per-project needs.
 export const API_CONFIG = {
-  development: "http://localhost:8001",
+  development: "http://localhost:3000",
   // Temporary public dev host (ngrok / cloud run etc.)
   staging: "https://ugc.vadapav.art",
   production: "https://ugc.vadapav.art",
@@ -42,7 +42,8 @@ export const API_BASE_URL: string = getApiBaseUrl();
  */
 export const API_ENDPOINTS = {
   // Authentication
-  login: "/api/auth/token",
+  // Updated login endpoint to new auth route requiring API key header
+  login: "/v1/auth/login",
 
   // HeyGen integration
   heygenAvatars: "/api/heygen/avatars",

@@ -4,7 +4,7 @@ import { getAuthToken as getStoredToken, setAuthToken as storeToken, removeAuthT
 
 interface AuthContextValue {
   token: string | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -16,10 +16,15 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(() => getStoredToken());
 
-  const login = async (username: string, password: string) => {
-    const data = await api.auth.login(username, password);
-    storeToken(data.access_token);
-    setToken(data.access_token);
+  const login = async (email: string, password: string) => {
+    const data: any = await api.auth.login(email, password);
+    // Support both { access_token } and { data: { token } } response shapes
+    const tokenResp: string | undefined = data?.access_token ?? data?.token ?? data?.data?.token;
+    if (!tokenResp) {
+      throw new Error("Login response did not contain a token");
+    }
+    storeToken(tokenResp);
+    setToken(tokenResp);
   };
 
   const logout = () => {

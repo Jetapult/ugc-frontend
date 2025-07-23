@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 
 const LoginDialog: React.FC = () => {
   const { token, login } = useAuth();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ const LoginDialog: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      await login(username, password);
+      await login(email, password);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -32,9 +32,9 @@ const LoginDialog: React.FC = () => {
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <h2 className="text-lg font-semibold">Login</h2>
           <Input
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
           />
           <Input
