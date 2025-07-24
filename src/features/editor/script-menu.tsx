@@ -6,6 +6,7 @@ import { uploadFile } from "@/utils/upload";
 import { api } from "@/lib/api";
 import { dispatch } from "@designcombo/events";
 import { useAuth } from "@/context/AuthContext";
+import { useDownloadState } from "./store/use-download-state";
 import AvatarPickerDialog from "@/components/heygen/avatar-picker-dialog";
 import { ADD_VIDEO } from "@designcombo/state";
 
@@ -21,6 +22,7 @@ import VoicePickerDialog from "../../components/heygen/voice-picker-dialog";
 import { Input } from "../../components/ui/input";
 
 const ScriptMenu: React.FC = () => {
+  const { projectId } = useDownloadState();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [videoUploaded, setVideoUploaded] = useState(false);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
@@ -364,7 +366,12 @@ const ScriptMenu: React.FC = () => {
                   setCreating(true);
 
                   try {
+                    if (!projectId) {
+                      throw new Error("Project ID is required for HeyGen video creation");
+                    }
+                    
                     const data: any = await api.heygen.videos.create({
+                      ugc_project_id: projectId,
                       avatar_pose_id:
                         selectedAvatar.avatar_id ??
                         selectedAvatar.avatar_pose_id ??
@@ -376,8 +383,11 @@ const ScriptMenu: React.FC = () => {
                       width,
                       height,
                     });
-                    const vid = data?.data?.video_id ?? data?.video_id;
-                    if (!vid) throw new Error("Missing video_id in response");
+                    const vid = data?.data?.heygen_response?.data?.video_id;
+                    if (!vid) {
+                      console.error("Full response:", JSON.stringify(data, null, 2));
+                      throw new Error("Missing video_id in response");
+                    }
                     console.log("Video created", vid);
                     setVideoId(vid);
                     setVideoStatus("processing");

@@ -213,6 +213,32 @@ export interface CreateHeyGenExportRequest extends Record<string, unknown> {
   };
 }
 
+// HeyGen Videos API Types
+export interface CreateHeyGenVideoRequest extends Record<string, unknown> {
+  ugc_project_id: string;     // Required for tracking
+  input_text: string;         // Required: Text to speak
+  voice_id: string;           // Required: Voice ID
+  avatar_pose_id?: string;    // Optional: Avatar pose
+  avatar_style?: string;      // Optional: Avatar style
+  width?: number;             // Optional: Video width
+  height?: number;            // Optional: Video height
+}
+
+export interface HeyGenVideoResponse extends Record<string, unknown> {
+  success: boolean;
+  data: {
+    export_id: string;
+    heygen_response: {
+      code: number;
+      data: {
+        video_id: string;
+      };
+      msg: string | null;
+      message: string | null;
+    };
+  };
+}
+
 export const api = {
   request: apiRequest,
   auth: {
@@ -415,10 +441,10 @@ export const api = {
         timeoutMs: 300_000, // 5 minutes to accommodate long script generation
       }),
     videos: {
-      create: (body: Record<string, unknown>) =>
-        apiRequest(`${API_ENDPOINTS.heygenVideos}/`, {
+      create: (data: CreateHeyGenVideoRequest): Promise<HeyGenVideoResponse> =>
+        apiRequest<HeyGenVideoResponse>(`${API_ENDPOINTS.heygenVideos}/`, {
           method: "POST",
-          body,
+          body: data,
           auth: true,
         }),
       status: (id: string) =>
