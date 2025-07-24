@@ -35,10 +35,11 @@ const stateManager = new StateManager({
 
 interface EditorProps {
   initialEditorState?: Record<string, unknown>;
+  projectName?: string;
 }
 
-const Editor = ({ initialEditorState }: EditorProps = {}) => {
-  const [projectName, setProjectName] = useState<string>("Untitled video");
+const Editor = ({ initialEditorState, projectName: initialProjectName }: EditorProps = {}) => {
+  const [projectName, setProjectName] = useState<string>(initialProjectName || "Untitled video");
   const timelinePanelRef = useRef<ImperativePanelHandle>(null);
   const { timeline, playerRef } = useStore();
   const { token } = useAuth();
@@ -47,6 +48,13 @@ const Editor = ({ initialEditorState }: EditorProps = {}) => {
   useTimelineEvents();
 
   const { setCompactFonts, setFonts } = useDataState();
+
+  // Update project name when prop changes
+  useEffect(() => {
+    if (initialProjectName) {
+      setProjectName(initialProjectName);
+    }
+  }, [initialProjectName]);
 
   useEffect(() => {
     setCompactFonts(getCompactFontData(FONTS));

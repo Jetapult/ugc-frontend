@@ -114,5 +114,5 @@ export default function ProjectEditorPage() {
     );
   }
 
-  return <Editor initialEditorState={project.editor_state} />;
+  return <Editor initialEditorState={project.editor_state} projectName={project.title} />;
 }

@@ -20,8 +20,7 @@ import { generateId } from "@designcombo/timeline";
 import { IDesign, IVideo } from "@designcombo/types";
 import { useDownloadState } from "./store/use-download-state";
 import DownloadProgressModal from "./download-progress-modal";
-import AutosizeInput from "@/components/ui/autosize-input";
-import { debounce } from "lodash";
+
 import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar({
@@ -37,7 +36,6 @@ export default function Navbar({
   onSave?: () => void;
 }) {
   const { logout } = useAuth();
-  const [title, setTitle] = useState(projectName);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -136,22 +134,7 @@ export default function Navbar({
   const handleCreateProject = async () => {};
 
   // Create a debounced function for setting the project name
-  const debouncedSetProjectName = useCallback(
-    debounce((name: string) => {
-      console.log("Debounced setProjectName:", name);
-      setProjectName(name);
-    }, 2000), // 2 seconds delay
-    [],
-  );
 
-  // Update the debounced function whenever the title changes
-  useEffect(() => {
-    debouncedSetProjectName(title);
-  }, [title, debouncedSetProjectName]);
-
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTitle(e.target.value);
-  };
 
   return (
     <div
@@ -186,13 +169,9 @@ export default function Navbar({
 
       <div className="flex h-14 items-center justify-center gap-2">
         <div className="bg-sidebar pointer-events-auto flex h-12 items-center gap-2 rounded-md px-2.5 text-muted-foreground">
-          <AutosizeInput
-            name="title"
-            value={title}
-            onChange={handleTitleChange}
-            width={200}
-            inputClassName="border-none outline-none px-1 bg-background text-sm font-medium text-zinc-200"
-          />
+          <div className="px-1 text-sm font-medium text-zinc-200">
+            {projectName}
+          </div>
         </div>
       </div>
 
