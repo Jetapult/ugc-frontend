@@ -22,6 +22,8 @@ import CropModal from "./crop-modal/crop-modal";
 import useDataState from "./store/use-data-state";
 import { FONTS } from "./data/fonts";
 import FloatingControl from "./control-item/floating-controls/floating-control";
+import { useAuth } from "@/context/AuthContext";
+import LoginDialog from "@/components/ui/login-dialog";
 
 const stateManager = new StateManager({
   size: {
@@ -34,6 +36,7 @@ const Editor = () => {
   const [projectName, setProjectName] = useState<string>("Untitled video");
   const timelinePanelRef = useRef<ImperativePanelHandle>(null);
   const { timeline, playerRef } = useStore();
+  const { token } = useAuth();
 
   useTimelineEvents();
 
@@ -80,6 +83,11 @@ const Editor = () => {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [timeline]);
+
+  // Show login dialog if not authenticated
+  if (!token) {
+    return <LoginDialog />;
+  }
 
   return (
     <div className="flex h-screen w-screen flex-col">

@@ -6,6 +6,7 @@
 
 import { API_BASE_URL, API_ENDPOINTS } from "./config";
 import { getAuthToken } from "./token";
+import { IDesign } from "@designcombo/types";
 
 export interface ApiRequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -88,27 +89,29 @@ export async function apiRequest<T = unknown>(
       data = text ? JSON.parse(text) : null;
     } catch {
       // non-json response
-      // eslint-disable-next-line no-console
       console.warn(`Non-JSON response from ${url}`);
       data = text as unknown;
     }
 
     if (!res.ok) {
+      const errorData = data as { detail?: string; error?: string; message?: string };
       const message =
-        (data as any)?.detail ||
-        (data as any)?.error ||
+        errorData?.detail ||
+        errorData?.error ||
+        errorData?.message ||
         res.statusText ||
         "Unknown error";
       throw new ApiError(message, res.status);
     }
 
     return data as T;
-  } catch (err: any) {
-    if (err.name === "AbortError") {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
       throw new ApiError("Request timed out");
     }
     if (err instanceof ApiError) throw err;
-    throw new ApiError(err?.message || "Unknown error");
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    throw new ApiError(errorMessage);
   }
 }
 
@@ -120,17 +123,273 @@ export interface LoginResponse {
   expires_in?: number;
 }
 
+// Project Management Types
+export interface Project {
+  id: string;
+  title: string;
+  design?: IDesign;
+  editor_state?: Record<string, unknown>;
+  user_id: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectListItem {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateProjectRequest extends Record<string, unknown> {
+  title: string;
+  design?: IDesign;
+  editor_state?: Record<string, unknown>;
+}
+
+export interface UpdateProjectRequest extends Record<string, unknown> {
+  title?: string;
+  design?: IDesign;
+  editor_state?: Record<string, unknown>;
+}
+
+// UGC Export Types
+export interface UGCExport {
+  id: string;
+  ugc_project_id: string;
+  user_id: number;
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+  progress: number;
+  url: string | null;
+  error: string | null;
+  design_json: IDesign;
+  options_json: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateUGCExportRequest extends Record<string, unknown> {
+  ugc_project_id: string;
+  design: IDesign;
+  options: {
+    fps: number;
+    size: {
+      width: number;
+      height: number;
+    };
+    format: string;
+    transparent: boolean;
+  };
+}
+
+// HeyGen Export Types
+export interface HeyGenExport {
+  id: string;
+  ugc_project_id: string;
+  user_id: number;
+  prompt: string;
+  voice_id: string;
+  avatar_id?: string;
+  dimensions?: {
+    width: number;
+    height: number;
+  };
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+  message: string | null;
+  video_url: string | null;
+  heygen_video_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateHeyGenExportRequest extends Record<string, unknown> {
+  ugc_project_id: string;
+  prompt: string;
+  voice_id: string;
+  avatar_id?: string;
+  dimensions?: {
+    width: number;
+    height: number;
+  };
+}
+
 export const api = {
   request: apiRequest,
   auth: {
-    // Login with email/password (no API key header required)
+    // Login with email/password
     login: (email: string, password: string) =>
       apiRequest<LoginResponse>(API_ENDPOINTS.login, {
         method: "POST",
-        body: JSON.stringify({ email, password }),
-        headers: { "Content-Type": "application/json" },
+        body: { email, password },
       }),
   },
+
+  // Project Management
+  projects: {
+    list: (params?: { limit?: number; offset?: number }) => {
+      const search = params
+        ? new URLSearchParams(
+            Object.entries(params).map(([k, v]) => [k, String(v)]),
+          ).toString()
+        : "";
+      return apiRequest<{ success: boolean; data: ProjectListItem[] }>(
+        `${API_ENDPOINTS.projects}${search ? `?${search}` : ""}`,
+        { auth: true },
+      );
+    },
+
+    create: (data: CreateProjectRequest) =>
+      apiRequest<{ success: boolean; data: Project }>(API_ENDPOINTS.projects, {
+        method: "POST",
+        body: data,
+        auth: true,
+      }),
+
+    get: (id: string) =>
+      apiRequest<{ success: boolean; data: Project }>(
+        API_ENDPOINTS.project(id),
+        {
+          auth: true,
+        },
+      ),
+
+    update: (id: string, data: UpdateProjectRequest) =>
+      apiRequest<{ success: boolean; data: Project }>(
+        API_ENDPOINTS.project(id),
+        {
+          method: "PUT",
+          body: data,
+          auth: true,
+        },
+      ),
+
+    delete: (id: string, deleteExports = false) =>
+      apiRequest<{ success: boolean; message: string }>(
+        `${API_ENDPOINTS.project(id)}?delete_exports=${deleteExports}`,
+        {
+          method: "DELETE",
+          auth: true,
+        },
+      ),
+  },
+
+  // UGC Export Management
+  ugcExports: {
+    list: (params?: {
+      ugc_project_id?: string;
+      limit?: number;
+      offset?: number;
+    }) => {
+      const search = params
+        ? new URLSearchParams(
+            Object.entries(params).map(([k, v]) => [k, String(v)]),
+          ).toString()
+        : "";
+      return apiRequest<{ success: boolean; data: UGCExport[] }>(
+        `${API_ENDPOINTS.ugcExports}${search ? `?${search}` : ""}`,
+        { auth: true },
+      );
+    },
+
+    create: (data: CreateUGCExportRequest) =>
+      apiRequest<{ video: { id: string } }>(API_ENDPOINTS.ugcExports, {
+        method: "POST",
+        body: data,
+        auth: true,
+      }),
+
+    get: (id: string) =>
+      apiRequest<{ success: boolean; data: UGCExport }>(
+        API_ENDPOINTS.ugcExport(id),
+        {
+          auth: true,
+        },
+      ),
+
+    update: (id: string, data: Partial<UGCExport>) =>
+      apiRequest<{ success: boolean; data: UGCExport }>(
+        API_ENDPOINTS.ugcExport(id),
+        {
+          method: "PUT",
+          body: data,
+          auth: true,
+        },
+      ),
+
+    delete: (id: string) =>
+      apiRequest<{ success: boolean; message: string }>(
+        API_ENDPOINTS.ugcExport(id),
+        {
+          method: "DELETE",
+          auth: true,
+        },
+      ),
+
+    upload: (formData: FormData) =>
+      apiRequest<{ url: string }>(API_ENDPOINTS.ugcUpload, {
+        method: "POST",
+        body: formData,
+        auth: true,
+      }),
+  },
+
+  // HeyGen Export Management
+  heygenExports: {
+    list: (params?: {
+      ugc_project_id?: string;
+      limit?: number;
+      offset?: number;
+    }) => {
+      const search = params
+        ? new URLSearchParams(
+            Object.entries(params).map(([k, v]) => [k, String(v)]),
+          ).toString()
+        : "";
+      return apiRequest<{ success: boolean; data: HeyGenExport[] }>(
+        `${API_ENDPOINTS.heygenExports}${search ? `?${search}` : ""}`,
+        { auth: true },
+      );
+    },
+
+    create: (data: CreateHeyGenExportRequest) =>
+      apiRequest<{ success: boolean; data: HeyGenExport }>(
+        API_ENDPOINTS.heygenExports,
+        {
+          method: "POST",
+          body: data,
+          auth: true,
+        },
+      ),
+
+    get: (id: string) =>
+      apiRequest<{ success: boolean; data: HeyGenExport }>(
+        API_ENDPOINTS.heygenExport(id),
+        {
+          auth: true,
+        },
+      ),
+
+    update: (id: string, data: Partial<HeyGenExport>) =>
+      apiRequest<{ success: boolean; data: HeyGenExport }>(
+        API_ENDPOINTS.heygenExport(id),
+        {
+          method: "PUT",
+          body: data,
+          auth: true,
+        },
+      ),
+
+    delete: (id: string) =>
+      apiRequest<{ success: boolean; message: string }>(
+        API_ENDPOINTS.heygenExport(id),
+        {
+          method: "DELETE",
+          auth: true,
+        },
+      ),
+  },
+
+  // HeyGen integration (existing endpoints)
   heygen: {
     avatars: (params: Record<string, string | number | boolean>) => {
       const search = new URLSearchParams(
@@ -168,25 +427,8 @@ export const api = {
         }),
     },
   },
+
   voices: {
     list: (language: string) => apiRequest(API_ENDPOINTS.voices(language)),
-  },
-  render: {
-    upload: (formData: FormData) =>
-      apiRequest<{ url: string }>(API_ENDPOINTS.renderUpload, {
-        method: "POST",
-        body: formData,
-        auth: true,
-      }),
-    create: (body: Record<string, unknown>) =>
-      apiRequest(API_ENDPOINTS.render, {
-        method: "POST",
-        body,
-        auth: true,
-      }),
-    status: (id: string) =>
-      apiRequest(`${API_ENDPOINTS.render}?id=${encodeURIComponent(id)}`, {
-        auth: true,
-      }),
   },
 } as const;

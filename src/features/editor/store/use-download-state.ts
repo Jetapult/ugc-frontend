@@ -34,10 +34,6 @@ interface DownloadState {
   };
 }
 
-
-
-
-
 export const useDownloadState = create<DownloadState>((set, get) => ({
   projectId: "",
   exporting: false,
@@ -70,19 +66,22 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
         set({
           exporting: true,
           displayProgressModal: true,
-          status: "PREPARING",
+          status: "PENDING",
           renderedFrames: 0,
           encodedFrames: 0,
           frameCount: 0,
+          progress: 0,
         });
 
-        // Assume payload to be stored in the state for POST request
-        const { payload } = get();
+        // Get payload and project ID from state
+        const { payload, projectId } = get();
 
         if (!payload) throw new Error("Payload is not defined");
+        if (!projectId) throw new Error("Project ID is not defined");
 
-        // Step 1: POST request to start rendering via central API layer
-        const jobInfo: any = await api.render.create({
+        // Step 1: POST request to create UGC export
+        const exportResponse = await api.ugcExports.create({
+          ugc_project_id: projectId,
           design: payload,
           options: {
             fps: 30,
@@ -91,43 +90,55 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
             transparent: get().exportType === "webm",
           },
         });
-        const videoId = jobInfo.video.id;
 
-        // Step 2 & 3: Polling for status updates
+        const exportId = exportResponse.video.id;
+
+        // Step 2: Polling for status updates
         const checkStatus = async () => {
-          const statusInfo: any = await api.render.status(videoId);
+          try {
+            const statusResponse = await api.ugcExports.get(exportId);
+            const exportData = statusResponse.data;
 
-          const { status, progress, url, error, renderedFrames, encodedFrames, frameCount } = statusInfo.video;
+            const { status, progress, url, error } = exportData;
 
-          // Update progress, status, and frame information in the UI
-          set({ 
-            progress: progress || 0, 
-            status: status || "",
-            renderedFrames: renderedFrames || 0,
-            encodedFrames: encodedFrames || 0,
-            frameCount: frameCount || 0
-          });
+            // Update progress and status in the UI
+            set({
+              progress: progress || 0,
+              status: status || "PENDING",
+              // Note: The new API doesn't provide frame counts in the same way
+              // We'll keep the existing frame tracking for UI consistency
+            });
 
-          if (status === "COMPLETED" && url) {
-            // Export completed successfully
-            set({ exporting: false, output: { url, type: get().exportType } });
-          } else if (status === "FAILED" || error) {
-            // Handle error case
-            console.error("Export failed:", error);
-            set({ exporting: false });
-            // Could show an error message to the user here
-          } else if (status === "PENDING" || status === "IN_PROGRESS") {
-            // Continue polling (but store the timeout ID so we can cancel it)
+            if (status === "COMPLETED" && url) {
+              // Export completed successfully
+              set({
+                exporting: false,
+                output: { url, type: get().exportType },
+                progress: 100,
+              });
+            } else if (status === "FAILED" || error) {
+              // Handle error case
+              console.error("Export failed:", error);
+              set({ exporting: false, status: "FAILED" });
+              // Could show an error message to the user here
+            } else if (status === "PENDING" || status === "PROCESSING") {
+              // Continue polling (but store the timeout ID so we can cancel it)
+              if (pollingTimeoutId) clearTimeout(pollingTimeoutId);
+              pollingTimeoutId = setTimeout(checkStatus, 2000); // Poll every 2 seconds
+            }
+          } catch (error) {
+            console.error("Error checking export status:", error);
+            // Continue polling on API errors (might be temporary)
             if (pollingTimeoutId) clearTimeout(pollingTimeoutId);
-            pollingTimeoutId = setTimeout(checkStatus, 2000); // Poll every 2 seconds
+            pollingTimeoutId = setTimeout(checkStatus, 5000); // Poll less frequently on errors
           }
         };
 
         // Start the polling
         checkStatus();
       } catch (error) {
-        console.error(error);
-        set({ exporting: false });
+        console.error("Error starting export:", error);
+        set({ exporting: false, status: "FAILED" });
         // Clear any polling on error
         if (pollingTimeoutId) {
           clearTimeout(pollingTimeoutId);

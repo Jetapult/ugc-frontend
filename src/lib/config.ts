@@ -5,7 +5,7 @@
 
 // Base URLs for each environment. Extend / tweak per-project needs.
 export const API_CONFIG = {
-  development: "http://localhost:3000",
+  development: "http://localhost:3000/",
   // Temporary public dev host (ngrok / cloud run etc.)
   staging: "https://ugc.vadapav.art",
   production: "https://ugc.vadapav.art",
@@ -22,7 +22,7 @@ export type ApiEnv = keyof typeof API_CONFIG;
  *   3. Fallback to `API_CONFIG.staging`.
  */
 export const getApiBaseUrl = (): string => {
-  const viteEnv = (import.meta as any).env ?? {};
+  const viteEnv = (import.meta as { env?: Record<string, string> }).env ?? {};
   // Highest priority – explicit URL
   if (viteEnv.VITE_BACKEND_URL) {
     return String(viteEnv.VITE_BACKEND_URL).replace(/\/$/, "");
@@ -42,21 +42,28 @@ export const API_BASE_URL: string = getApiBaseUrl();
  */
 export const API_ENDPOINTS = {
   // Authentication
-  // Updated login endpoint to new auth route requiring API key header
   login: "/v1/auth/login",
 
-  // HeyGen integration
-  heygenAvatars: "/api/heygen/avatars",
-  heygenVoices: "/api/heygen/voices",
-  heygenGenerateScript: "/api/heygen/generate_script",
-  heygenVideos: "/api/heygen/videos",
+  // Project Management
+  projects: "/v1/projects",
+  project: (id: string) => `/v1/projects/${id}`,
+
+  // UGC Export Management
+  ugcExports: "/v1/ugc/exports",
+  ugcExport: (id: string) => `/v1/ugc/exports/${id}`,
+  ugcUpload: "/v1/ugc/upload",
+
+  // HeyGen Export Management
+  heygenExports: "/v1/heygen/exports",
+  heygenExport: (id: string) => `/v1/heygen/exports/${id}`,
+
+  // HeyGen integration (existing endpoints)
+  heygenAvatars: "/v1/heygen/avatars",
+  heygenVoices: "/v1/heygen/voices",
+  heygenGenerateScript: "/v1/heygen/generate_script",
+  heygenVideos: "/v1/heygen/videos",
 
   // Voice-over voices endpoint
   voices: (language: string) =>
     `/api/voices?language=${encodeURIComponent(language)}`,
-
-  // Render / upload
-  renderUpload: "/api/render/upload",
-  // Render endpoints – note trailing slash to avoid backend redirect
-  render: "/api/render/", // POST to create, GET to poll status (?id=)
 } as const;
