@@ -24,6 +24,7 @@ import { FONTS } from "./data/fonts";
 import FloatingControl from "./control-item/floating-controls/floating-control";
 import { useAuth } from "@/context/AuthContext";
 import LoginDialog from "@/components/ui/login-dialog";
+import { useProjectState } from "./hooks/use-project-state";
 
 const stateManager = new StateManager({
   size: {
@@ -32,11 +33,16 @@ const stateManager = new StateManager({
   },
 });
 
-const Editor = () => {
+interface EditorProps {
+  initialEditorState?: Record<string, unknown>;
+}
+
+const Editor = ({ initialEditorState }: EditorProps = {}) => {
   const [projectName, setProjectName] = useState<string>("Untitled video");
   const timelinePanelRef = useRef<ImperativePanelHandle>(null);
   const { timeline, playerRef } = useStore();
   const { token } = useAuth();
+  const { saveState, restoreState } = useProjectState(stateManager);
 
   useTimelineEvents();
 
@@ -55,6 +61,14 @@ const Editor = () => {
       },
     ]);
   }, []);
+
+  // Restore editor state when provided
+  useEffect(() => {
+    if (initialEditorState) {
+      console.log('Restoring editor state from project:', initialEditorState);
+      restoreState(initialEditorState as any);
+    }
+  }, [initialEditorState, restoreState]);
 
   useEffect(() => {
     const screenHeight = window.innerHeight;
@@ -96,6 +110,7 @@ const Editor = () => {
         user={null}
         stateManager={stateManager}
         setProjectName={setProjectName}
+        onSave={saveState}
       />
       <div className="flex flex-1">
         <ResizablePanelGroup style={{ flex: 1 }} direction="vertical">

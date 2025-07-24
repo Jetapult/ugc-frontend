@@ -18,7 +18,7 @@ export const uploadFile = async (
   const formData = new FormData();
   formData.append("file", file, file.name);
 
-    const data = await api.render.upload(formData);
+    const data = await api.ugcExports.upload(formData);
   if (!data?.url) throw new Error("Upload failed: response missing url");
   return data.url;
 

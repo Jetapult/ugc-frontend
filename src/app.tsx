@@ -1,12 +1,15 @@
 import { Outlet } from "react-router-dom";
-import { AuthProvider } from "@/context/AuthContext";
-import LoginDialog from "@/components/ui/login-dialog";
+import { AuthProvider } from "./context/AuthContext";
+import LoginDialog from "./components/ui/login-dialog";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 export default function App() {
   return (
-    <AuthProvider>
-      <LoginDialog />
-      <Outlet />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <LoginDialog />
+        <Outlet />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

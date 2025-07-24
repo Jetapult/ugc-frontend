@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import Editor from "@/features/editor";
+import Editor from "@/features/editor/editor";
 import useDataState from "@/features/editor/store/use-data-state";
 import { useDownloadState } from "@/features/editor/store/use-download-state";
 import { getCompactFontData } from "@/features/editor/utils/fonts";
 import { FONTS } from "@/features/editor/data/fonts";
 import { api, type Project } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import LoginDialog from "@/components/ui/login-dialog";
+import { useProjectState } from "@/features/editor/hooks/use-project-state";
 
 export default function ProjectEditorPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -112,5 +114,5 @@ export default function ProjectEditorPage() {
     );
   }
 
-  return <Editor />;
+  return <Editor initialEditorState={project.editor_state} />;
 }

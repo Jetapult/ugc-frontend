@@ -28,19 +28,49 @@ export default function Navbar({
   stateManager,
   setProjectName,
   projectName,
+  onSave,
 }: {
   user: null;
   stateManager: StateManager;
   setProjectName: (name: string) => void;
   projectName: string;
+  onSave?: () => void;
 }) {
   const { logout } = useAuth();
   const [title, setTitle] = useState(projectName);
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleAddFiles = () => {
     fileInputRef.current?.click();
   };
+
+  const handleSave = useCallback(async () => {
+    if (!onSave || saving) return;
+    
+    setSaving(true);
+    try {
+      await onSave();
+      console.log('Project saved successfully');
+    } catch (error) {
+      console.error('Failed to save project:', error);
+    } finally {
+      setSaving(false);
+    }
+  }, [onSave, saving]);
+
+  // Keyboard shortcut for save (Cmd+S / Ctrl+S)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSave]);
 
   const handleFilesSelected = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -175,6 +205,19 @@ export default function Navbar({
             variant="outline"
           >
             <PlusIcon width={18} /> Add file
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={saving || !onSave}
+            className="flex h-8 gap-1 border border-border text-green-400 hover:bg-green-500/10 disabled:opacity-50"
+            variant="outline"
+          >
+            {saving ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-400" />
+            ) : (
+              <span className="text-sm">💾</span>
+            )}
+            {saving ? 'Saving...' : 'Save'}
           </Button>
           <Button
             onClick={logout}
