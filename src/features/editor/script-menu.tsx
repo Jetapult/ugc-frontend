@@ -5,7 +5,7 @@ import { PlusIcon, Loader2 } from "lucide-react";
 import { uploadFile } from "@/utils/upload";
 import { api } from "@/lib/api";
 import { dispatch } from "@designcombo/events";
-import { useAuth } from "@/context/AuthContext";
+
 import { useDownloadState } from "./store/use-download-state";
 import AvatarPickerDialog from "@/components/heygen/avatar-picker-dialog";
 import { ADD_VIDEO } from "@designcombo/state";
@@ -21,6 +21,7 @@ import { generateId } from "@designcombo/timeline";
 import type { IVideo } from "@designcombo/types";
 import VoicePickerDialog from "../../components/heygen/voice-picker-dialog";
 import { Input } from "../../components/ui/input";
+import PendingHeyGenExports from "./pending-heygen-exports";
 
 const ScriptMenu: React.FC = () => {
   const { projectId } = useDownloadState();
@@ -41,17 +42,31 @@ const ScriptMenu: React.FC = () => {
   const [height, setHeight] = useState(720);
   const [creating, setCreating] = useState(false);
   const [videoId, setVideoId] = useState<string | null>(null);
+  // possible values:
+  // - idle: initial state or reset
+  // - pending: request has been sent but remote processing hasn’t started
+  // - processing: remote service is actively generating the video
+  // - completed: finished successfully
+  // - error: something went wrong
   const [videoStatus, setVideoStatus] = useState<
-    "idle" | "processing" | "completed" | "error" | "pending"
+    "idle" | "pending" | "processing" | "completed" | "error"
   >("idle");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoAdded, setVideoAdded] = useState(false);
   const [resumeVideoId, setResumeVideoId] = useState("");
+  // tab navigation state
+  const [activeTab, setActiveTab] = useState<"generate" | "pending">(
+    "generate",
+  );
+
+  // Ensure onValueChange matches expected signature (string => void)
+  const handleTabChange = (value: string) =>
+    setActiveTab(value as "generate" | "pending");
+
   // track auto-download & timeline insertion phases
   const [addPhase, setAddPhase] = useState<
     "idle" | "downloading" | "adding" | "done"
   >("idle");
-  const { token } = useAuth();
 
   const handleUploadClick = () => fileInputRef.current?.click();
 
@@ -102,27 +117,6 @@ const ScriptMenu: React.FC = () => {
       setVideoUploaded(true);
     };
   };
-
-  // Poll video processing status
-  useEffect(() => {
-    if (videoStatus !== "processing" || !videoId) return;
-    const interval = setInterval(async () => {
-      try {
-        const statusJson: any = await api.heygen.videos.status(videoId);
-        const status = statusJson?.data?.status;
-        if (status === "completed") {
-          setVideoStatus("completed");
-          setVideoUrl(statusJson?.data?.video_url || "");
-        } else if (status && status !== "processing") {
-          // setVideoStatus("error");
-          console.log("Video processing failed", status);
-        }
-      } catch {
-        setVideoStatus("error");
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [videoStatus, videoId, token]);
 
   // When video completes, auto download and add to editor once
   useEffect(() => {
@@ -208,7 +202,7 @@ const ScriptMenu: React.FC = () => {
 
   return (
     <div className="flex w-full flex-col gap-3 overflow-auto p-4 text-sm">
-      <Tabs defaultValue="generate" className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="generate">Generate Video</TabsTrigger>
           <TabsTrigger value="pending">Pending Videos</TabsTrigger>
@@ -369,11 +363,14 @@ const ScriptMenu: React.FC = () => {
                     <Button
                       className="mt-3 w-full"
                       variant="default"
-                      disabled={creating || !script}
+                      disabled={
+                        creating || (videoStatus as any) === "processing" || !script
+                      }
                       onClick={async () => {
                         if (!selectedAvatar || !selectedVoice || !script)
                           return;
                         setVideoStatus("processing");
+                        setActiveTab("pending");
                         setVideoAdded(false);
                         setCreating(true);
 
@@ -417,7 +414,11 @@ const ScriptMenu: React.FC = () => {
                         }
                       }}
                     >
-                      {creating ? "Creating…" : "Create video"}
+                      {creating
+                        ? "Creating…"
+                        : (videoStatus as any) === "processing"
+                          ? "Processing…"
+                          : "Create video"}
                     </Button>
                   ))}
 
@@ -434,6 +435,7 @@ const ScriptMenu: React.FC = () => {
                     if (!resumeVideoId) return;
                     setVideoId(resumeVideoId.trim());
                     setVideoStatus("processing");
+                    setActiveTab("pending");
                     setVideoUrl(null);
                     setVideoAdded(false);
                     setAddPhase("idle");
@@ -446,18 +448,7 @@ const ScriptMenu: React.FC = () => {
                 (videoStatus === "completed" &&
                   !videoAdded &&
                   addPhase !== "done") ? (
-                  <div className="mt-3 flex w-full flex-col items-center gap-1">
-                    {/* <Loader2 className="h-5 w-5 animate-spin text-primary" /> */}
-                    {/* <p className="text-xs text-muted-foreground">
-                      {videoStatus === "processing"
-                        ? `Current Status: ${videoStatus}. this can take a few minutes`
-                        : addPhase === "downloading"
-                          ? "Downloading processed video…"
-                          : addPhase === "adding"
-                            ? "Adding video to timeline…"
-                            : "Finalizing…"}
-                    </p> */}
-                  </div>
+                  <div className="mt-3 flex w-full flex-col items-center gap-1"></div>
                 ) : videoStatus === "completed" &&
                   videoUrl &&
                   !videoAdded &&
@@ -482,16 +473,6 @@ const ScriptMenu: React.FC = () => {
                     </Button>
                   </div>
                 ) : videoStatus === "completed" && videoUrl && videoAdded ? (
-                  // <Button asChild className="mt-3 w-full" variant="default">
-                  //   <a
-                  //     href={videoUrl}
-                  //     target="_blank"
-                  //     rel="noopener noreferrer"
-                  //     download
-                  //   >
-                  //     Download video
-                  //   </a>
-                  // </Button>
                   <div></div>
                 ) : (
                   <></>
@@ -502,9 +483,7 @@ const ScriptMenu: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="pending" className="mt-4">
-          <div className="text-sm text-muted-foreground">
-            Pending videos will be listed here
-          </div>
+          <PendingHeyGenExports projectId={projectId} />
         </TabsContent>
       </Tabs>
     </div>
