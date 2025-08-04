@@ -52,6 +52,7 @@ export const API_ENDPOINTS = {
   ugcExports: "/v1/ugc/exports",
   ugcExport: (id: string) => `/v1/ugc/exports/${id}`,
   ugcUpload: "/v1/ugc/upload",
+  ugcUploads: "/v1/ugc/uploads", // NEW: list uploaded media
 
   // HeyGen Export Management
   heygenExports: "/v1/heygen/exports",

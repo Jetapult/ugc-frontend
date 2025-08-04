@@ -94,7 +94,11 @@ export async function apiRequest<T = unknown>(
     }
 
     if (!res.ok) {
-      const errorData = data as { detail?: string; error?: string; message?: string };
+      const errorData = data as {
+        detail?: string;
+        error?: string;
+        message?: string;
+      };
       const message =
         errorData?.detail ||
         errorData?.error ||
@@ -182,6 +186,13 @@ export interface CreateUGCExportRequest extends Record<string, unknown> {
   };
 }
 
+// Upload Types
+export interface UploadItem extends Record<string, unknown> {
+  url: string;
+  filename: string;
+  thumbnail_url: string;
+}
+
 // HeyGen Export Types
 export interface HeyGenExport {
   id: string;
@@ -215,13 +226,13 @@ export interface CreateHeyGenExportRequest extends Record<string, unknown> {
 
 // HeyGen Videos API Types
 export interface CreateHeyGenVideoRequest extends Record<string, unknown> {
-  ugc_project_id: string;     // Required for tracking
-  input_text: string;         // Required: Text to speak
-  voice_id: string;           // Required: Voice ID
-  avatar_pose_id?: string;    // Optional: Avatar pose
-  avatar_style?: string;      // Optional: Avatar style
-  width?: number;             // Optional: Video width
-  height?: number;            // Optional: Video height
+  ugc_project_id: string; // Required for tracking
+  input_text: string; // Required: Text to speak
+  voice_id: string; // Required: Voice ID
+  avatar_pose_id?: string; // Optional: Avatar pose
+  avatar_style?: string; // Optional: Avatar style
+  width?: number; // Optional: Video width
+  height?: number; // Optional: Video height
 }
 
 export interface HeyGenVideoResponse extends Record<string, unknown> {
@@ -357,6 +368,24 @@ export const api = {
         body: formData,
         auth: true,
       }),
+  },
+
+  // UGC Uploads Listing
+  uploads: {
+    list: (params?: { limit?: number; offset?: number }) => {
+      const search = params
+        ? new URLSearchParams(
+            Object.entries(params).map(([k, v]) => [k, String(v)]),
+          ).toString()
+        : "";
+      return apiRequest<{
+        success: boolean;
+        data: UploadItem[];
+        pagination?: Record<string, unknown>;
+      }>(`${API_ENDPOINTS.ugcUploads}${search ? `?${search}` : ""}`, {
+        auth: true,
+      });
+    },
   },
 
   // HeyGen Export Management

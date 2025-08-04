@@ -72,6 +72,21 @@ export default function MenuList() {
       </Button>
       <Button
         onClick={() => {
+          setActiveMenuItem("library");
+          setShowMenuItem(true);
+        }}
+        className={cn(
+          showMenuItem && activeMenuItem === "library"
+            ? "bg-secondary"
+            : "text-muted-foreground",
+        )}
+        variant={"ghost"}
+        size={"icon"}
+      >
+        <Icons.video width={16} />
+      </Button>
+      <Button
+        onClick={() => {
           setActiveMenuItem("texts");
           setShowMenuItem(true);
         }}
