@@ -91,6 +91,7 @@ const PendingHeyGenExports: React.FC<PendingHeyGenExportsProps> = ({ projectId }
         const statusVariant = statusVariantMap[status] || "secondary";
         const created = formatDistanceToNow(new Date(exp.created_at), { addSuffix: true });
         const lastUpdated = formatDistanceToNow(new Date(exp.updated_at), { addSuffix: true });
+        const shortId = exp.id.slice(-5);
 
         return (
           <Dialog key={exp.id}>
@@ -101,7 +102,7 @@ const PendingHeyGenExports: React.FC<PendingHeyGenExportsProps> = ({ projectId }
                 )}
               >
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium">{(exp as any).project_title ?? "Export"}</span>
+                  <span className="text-sm font-medium">{shortId}</span>
                   <span className="text-xs text-muted-foreground">{created}</span>
                 </div>
                 <div className="flex items-center gap-2">

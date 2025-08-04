@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { dispatch } from "@designcombo/events";
 import {
@@ -14,6 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ChevronDown, Download, PlusIcon } from "lucide-react";
+import UGCExportsDialog from "./ugc-exports-dialog";
 import { Label } from "@/components/ui/label";
 import type StateManager from "@designcombo/state";
 import { generateId } from "@designcombo/timeline";
@@ -36,6 +38,7 @@ export default function Navbar({
   onSave?: () => void;
 }) {
   const { logout } = useAuth();
+  const { projectId } = useParams<{ projectId?: string }>();
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -177,7 +180,18 @@ export default function Navbar({
 
       <div className="flex h-14 items-center justify-end gap-2">
         <div className="bg-sidebar pointer-events-auto flex h-12 items-center gap-2 rounded-md px-2.5">
-          <DownloadPopover stateManager={stateManager} />
+          
+          <UGCExportsDialog
+            projectId={projectId}
+            getExportPayload={async () => {
+              const design = { id: generateId(), ...stateManager.getState() } as any;
+              const { width, height } = design.size || { width: 1080, height: 1920 };
+              return {
+                design_json: design,
+                options_json: { fps: 30, size: { width, height }, transparent: false },
+              };
+            }}
+          />
           <Button
             onClick={handleAddFiles}
             className="flex h-8 gap-1 border border-border"
