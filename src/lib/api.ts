@@ -170,6 +170,7 @@ export interface UGCExport {
   options_json: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  project_title?: string; // optional project title for display purposes
 }
 
 export interface CreateUGCExportRequest extends Record<string, unknown> {
