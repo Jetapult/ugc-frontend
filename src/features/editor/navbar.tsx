@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { dispatch } from "@designcombo/events";
 import {
@@ -14,6 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ChevronDown, Download, PlusIcon } from "lucide-react";
+import UGCExportsDialog from "./ugc-exports-dialog";
 import { Label } from "@/components/ui/label";
 import type StateManager from "@designcombo/state";
 import { generateId } from "@designcombo/timeline";
@@ -36,6 +38,7 @@ export default function Navbar({
   onSave?: () => void;
 }) {
   const { logout } = useAuth();
+  const { projectId } = useParams<{ projectId?: string }>();
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -45,13 +48,13 @@ export default function Navbar({
 
   const handleSave = useCallback(async () => {
     if (!onSave || saving) return;
-    
+
     setSaving(true);
     try {
       await onSave();
-      console.log('Project saved successfully');
+      console.log("Project saved successfully");
     } catch (error) {
-      console.error('Failed to save project:', error);
+      console.error("Failed to save project:", error);
     } finally {
       setSaving(false);
     }
@@ -60,14 +63,14 @@ export default function Navbar({
   // Keyboard shortcut for save (Cmd+S / Ctrl+S)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
         handleSave();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleSave]);
 
   const handleFilesSelected = async (
@@ -135,7 +138,6 @@ export default function Navbar({
 
   // Create a debounced function for setting the project name
 
-
   return (
     <div
       style={{
@@ -177,7 +179,28 @@ export default function Navbar({
 
       <div className="flex h-14 items-center justify-end gap-2">
         <div className="bg-sidebar pointer-events-auto flex h-12 items-center gap-2 rounded-md px-2.5">
-          <DownloadPopover stateManager={stateManager} />
+          <UGCExportsDialog
+            projectId={projectId}
+            getExportPayload={async () => {
+              const design = {
+                id: generateId(),
+                ...stateManager.getState(),
+              } as any;
+              const { width, height } = design.size || {
+                width: 1080,
+                height: 1920,
+              };
+              return {
+                design,
+                options: {
+                  fps: 30,
+                  size: { width, height },
+                  format: "mp4",
+                  transparent: false,
+                },
+              };
+            }}
+          />
           <Button
             onClick={handleAddFiles}
             className="flex h-8 gap-1 border border-border"
@@ -192,11 +215,11 @@ export default function Navbar({
             variant="outline"
           >
             {saving ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-400" />
+              <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-green-400" />
             ) : (
               <span className="text-sm">💾</span>
             )}
-            {saving ? 'Saving...' : 'Save'}
+            {saving ? "Saving..." : "Save"}
           </Button>
           <Button
             onClick={logout}

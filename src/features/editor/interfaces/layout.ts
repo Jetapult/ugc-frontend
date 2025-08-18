@@ -8,6 +8,8 @@ export type IMenuItem =
   | "shapes"
   | "audios"
   | "script"
+  | "veo3"
+  | "library"
   | "transitions"
   | "texts"
   | "captions"

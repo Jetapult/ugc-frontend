@@ -5,9 +5,12 @@ import { PlusIcon, Loader2 } from "lucide-react";
 import { uploadFile } from "@/utils/upload";
 import { api } from "@/lib/api";
 import { dispatch } from "@designcombo/events";
-import { useAuth } from "@/context/AuthContext";
+
+import { useDownloadState } from "./store/use-download-state";
 import AvatarPickerDialog from "@/components/heygen/avatar-picker-dialog";
 import { ADD_VIDEO } from "@designcombo/state";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 
 // Add interface to support video cache on window object
 declare global {
@@ -19,8 +22,10 @@ import { generateId } from "@designcombo/timeline";
 import type { IVideo } from "@designcombo/types";
 import VoicePickerDialog from "../../components/heygen/voice-picker-dialog";
 import { Input } from "../../components/ui/input";
+import PendingHeyGenExports from "./pending-heygen-exports";
 
 const ScriptMenu: React.FC = () => {
+  const { projectId } = useDownloadState();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [videoUploaded, setVideoUploaded] = useState(false);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
@@ -38,17 +43,33 @@ const ScriptMenu: React.FC = () => {
   const [height, setHeight] = useState(720);
   const [creating, setCreating] = useState(false);
   const [videoId, setVideoId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  // possible values:
+  // - idle: initial state or reset
+  // - pending: request has been sent but remote processing hasn’t started
+  // - processing: remote service is actively generating the video
+  // - completed: finished successfully
+  // - error: something went wrong
   const [videoStatus, setVideoStatus] = useState<
-    "idle" | "processing" | "completed" | "error" | "pending"
+    "idle" | "pending" | "processing" | "completed" | "error"
   >("idle");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoAdded, setVideoAdded] = useState(false);
   const [resumeVideoId, setResumeVideoId] = useState("");
+  // tab navigation state
+  const [activeTab, setActiveTab] = useState<"generate" | "pending">(
+    "generate",
+  );
+
+  // Ensure onValueChange matches expected signature (string => void)
+  const handleTabChange = (value: string) =>
+    setActiveTab(value as "generate" | "pending");
+
   // track auto-download & timeline insertion phases
   const [addPhase, setAddPhase] = useState<
     "idle" | "downloading" | "adding" | "done"
   >("idle");
-  const { token } = useAuth();
 
   const handleUploadClick = () => fileInputRef.current?.click();
 
@@ -60,14 +81,32 @@ const ScriptMenu: React.FC = () => {
     if (!file || !file.type.startsWith("video/")) return;
 
     const objectUrl = URL.createObjectURL(file);
+    setIsUploading(true);
+    setUploadProgress(0);
 
     let publicUrl: string;
     try {
+      // Simulate progress during upload
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + Math.random() * 20;
+        });
+      }, 200);
+
       publicUrl = await uploadFile(file);
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
       setUploadedUrl(publicUrl);
     } catch (err) {
       console.error("Upload failed", err);
       URL.revokeObjectURL(objectUrl);
+      setIsUploading(false);
+      setUploadProgress(0);
       return;
     }
 
@@ -97,29 +136,9 @@ const ScriptMenu: React.FC = () => {
         options: { resourceId: "main", scaleMode: "fit" },
       });
       setVideoUploaded(true);
+      setIsUploading(false);
     };
   };
-
-  // Poll video processing status
-  useEffect(() => {
-    if (videoStatus !== "processing" || !videoId) return;
-    const interval = setInterval(async () => {
-      try {
-        const statusJson: any = await api.heygen.videos.status(videoId);
-        const status = statusJson?.data?.status;
-        if (status === "completed") {
-          setVideoStatus("completed");
-          setVideoUrl(statusJson?.data?.video_url || "");
-        } else if (status && status !== "processing") {
-          // setVideoStatus("error");
-          console.log("Video processing failed", status);
-        }
-      } catch {
-        setVideoStatus("error");
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [videoStatus, videoId, token]);
 
   // When video completes, auto download and add to editor once
   useEffect(() => {
@@ -205,271 +224,304 @@ const ScriptMenu: React.FC = () => {
 
   return (
     <div className="flex w-full flex-col gap-3 overflow-auto p-4 text-sm">
-      <Button
-        className="flex gap-1 border border-border"
-        variant="outline"
-        onClick={handleUploadClick}
-      >
-        <PlusIcon size={18} /> Upload video
-      </Button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="video/*"
-        className="hidden"
-        onChange={handleFilesSelected}
-      />
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="generate">Generate Video</TabsTrigger>
+          <TabsTrigger value="pending">Pending Videos</TabsTrigger>
+        </TabsList>
 
-      {videoUploaded && (
-        <div className="flex flex-col gap-2">
-          <Textarea
-            placeholder="Additional context (optional)"
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            className="min-h-[80px] text-xs"
-          />
-          <Button
-            variant="default"
-            disabled={generating || !uploadedUrl}
-            onClick={async () => {
-              if (!uploadedUrl) return;
-              setGenerating(true);
-              try {
-
-                const data: any = await api.heygen.generateScript({ url: uploadedUrl, context });
-                const text = data?.script ?? data?.text ?? data;
-                setScript(String(text));
-              } catch (err) {
-                console.error(err);
-              } finally {
-                setGenerating(false);
-              }
-            }}
-          >
-            {generating ? "Generating…" : "Generate script"}
-          </Button>
-        </div>
-      )}
-
-      {script !== null && (
-        <>
-          <Textarea
-            value={script}
-            onChange={(e) => setScript(e.target.value)}
-            className="min-h-[140px] w-full text-xs"
-          />
-          <div className="mt-2 grid w-full grid-cols-2 gap-2">
+        <TabsContent value="generate" className="mt-4">
+          <div className="flex w-full flex-col gap-3">
             <Button
-              variant="secondary"
-              className="w-full"
-              onClick={() => setAvatarDialogOpen(true)}
+              className="flex gap-1 border border-border"
+              variant="outline"
+              onClick={handleUploadClick}
+              disabled={isUploading}
             >
-              {selectedAvatar ? "Change avatar" : "Select avatar"}
+              {isUploading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <PlusIcon size={18} />
+              )}
+              {isUploading ? "Uploading..." : "Upload video"}
             </Button>
-            <Button
-              variant="secondary"
-              className="w-full"
-              onClick={() => setVoiceDialogOpen(true)}
-            >
-              {selectedVoice ? "Change voice" : "Select voice"}
-            </Button>
-          </div>
-          <div className="mt-1 flex flex-col gap-2">
-            <p className="text-xs text-muted-foreground">Resolution</p>
-            <div className="flex w-full items-center gap-2">
-              <Input
-                type="number"
-                value={width}
-                onChange={(e) => setWidth(Number(e.target.value))}
-                className="flex-1"
-                min={1}
-              />
-              <span className="text-sm">x</span>
-              <Input
-                type="number"
-                value={height}
-                onChange={(e) => setHeight(Number(e.target.value))}
-                className="flex-1"
-                min={1}
-              />
-            </div>
-          </div>
-
-          {selectedVoice && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Selected voice:{" "}
-              <span className="font-medium text-foreground">
-                {selectedVoice.name}
-              </span>
-            </p>
-          )}
-          {selectedAvatar && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Selected avatar:{" "}
-              <span className="font-medium text-foreground">
-                {selectedAvatar.avatar_name}
-              </span>
-            </p>
-          )}
-          <AvatarPickerDialog
-            open={avatarDialogOpen}
-            onOpenChange={setAvatarDialogOpen}
-            onSelect={(a) => setSelectedAvatar(a)}
-          />
-          <VoicePickerDialog
-            open={voiceDialogOpen}
-            onOpenChange={setVoiceDialogOpen}
-            onSelect={(v) =>
-              setSelectedVoice({ voice_id: v.voice_id, name: v.name })
-            }
-          />
-          {selectedAvatar &&
-            selectedVoice &&
-            (videoStatus === "processing" ||
-            (videoStatus === "completed" &&
-              !videoAdded &&
-              addPhase !== "done") ? (
-              <div className="mt-3 flex w-full flex-col items-center gap-1">
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <p className="text-xs text-muted-foreground">
-                  {videoStatus === "processing"
-                    ? `Current Status: ${videoStatus}. this can take a few minutes`
-                    : addPhase === "downloading"
-                      ? "Downloading processed video…"
-                      : addPhase === "adding"
-                        ? "Adding video to timeline…"
-                        : "Finalizing…"}
-                </p>
+            {isUploading && (
+              <div className="flex flex-col gap-2">
+                <Progress value={uploadProgress} className="w-full" />
+                <span className="text-xs text-muted-foreground text-center">
+                  Uploading video... {Math.round(uploadProgress)}%
+                </span>
               </div>
-            ) : videoStatus === "completed" && videoUrl && videoAdded ? (
-              <Button asChild className="mt-3 w-full" variant="default">
-                <a
-                  href={videoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download
-                >
-                  Download video
-                </a>
-              </Button>
-            ) : (
-              <Button
-                className="mt-3 w-full"
-                variant="default"
-                disabled={creating || !script}
-                onClick={async () => {
-                  if (!selectedAvatar || !selectedVoice || !script) return;
-                  setVideoStatus("processing");
-                  setVideoAdded(false);
-                  setCreating(true);
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={handleFilesSelected}
+            />
 
-                  try {
-                    const data: any = await api.heygen.videos.create({
-                      avatar_pose_id:
-                        selectedAvatar.avatar_id ??
-                        selectedAvatar.avatar_pose_id ??
-                        selectedAvatar.avatarId ??
-                        selectedAvatar.avatar_id,
-                      avatar_style: "normal",
-                      input_text: script,
-                      voice_id: selectedVoice.voice_id,
-                      width,
-                      height,
-                    });
-                    const vid = data?.data?.video_id ?? data?.video_id;
-                    if (!vid) throw new Error("Missing video_id in response");
-                    console.log("Video created", vid);
-                    setVideoId(vid);
-                    setVideoStatus("processing");
-                    setVideoUrl(null);
-                  } catch (err: any) {
-                    alert(err.message ?? "Error");
-                  } finally {
-                    setCreating(false);
+            {videoUploaded && (
+              <div className="flex flex-col gap-2">
+                <Textarea
+                  placeholder="Additional context (optional)"
+                  value={context}
+                  onChange={(e) => setContext(e.target.value)}
+                  className="min-h-[80px] text-xs"
+                />
+                <Button
+                  variant="default"
+                  disabled={generating || !uploadedUrl}
+                  onClick={async () => {
+                    if (!uploadedUrl) return;
+                    setGenerating(true);
+                    try {
+                      const data: any = await api.heygen.generateScript({
+                        url: uploadedUrl,
+                        context,
+                      });
+                      const text = data?.script ?? data?.text ?? data;
+                      setScript(String(text));
+                    } catch (err) {
+                      console.error(err);
+                    } finally {
+                      setGenerating(false);
+                    }
+                  }}
+                >
+                  {generating ? "Generating…" : "Generate script"}
+                </Button>
+              </div>
+            )}
+
+            {script !== null && (
+              <>
+                <Textarea
+                  value={script}
+                  onChange={(e) => setScript(e.target.value)}
+                  className="min-h-[140px] w-full text-xs"
+                />
+                <div className="mt-2 grid w-full grid-cols-2 gap-2">
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => setAvatarDialogOpen(true)}
+                  >
+                    {selectedAvatar ? "Change avatar" : "Select avatar"}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => setVoiceDialogOpen(true)}
+                  >
+                    {selectedVoice ? "Change voice" : "Select voice"}
+                  </Button>
+                </div>
+                <div className="mt-1 flex flex-col gap-2">
+                  <p className="text-xs text-muted-foreground">Resolution</p>
+                  <div className="flex w-full items-center gap-2">
+                    <Input
+                      type="number"
+                      value={width}
+                      onChange={(e) => setWidth(Number(e.target.value))}
+                      className="flex-1"
+                      min={1}
+                    />
+                    <span className="text-sm">x</span>
+                    <Input
+                      type="number"
+                      value={height}
+                      onChange={(e) => setHeight(Number(e.target.value))}
+                      className="flex-1"
+                      min={1}
+                    />
+                  </div>
+                </div>
+
+                {selectedVoice && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Selected voice:{" "}
+                    <span className="font-medium text-foreground">
+                      {selectedVoice.name}
+                    </span>
+                  </p>
+                )}
+                {selectedAvatar && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Selected avatar:{" "}
+                    <span className="font-medium text-foreground">
+                      {selectedAvatar.avatar_name}
+                    </span>
+                  </p>
+                )}
+                <AvatarPickerDialog
+                  open={avatarDialogOpen}
+                  onOpenChange={setAvatarDialogOpen}
+                  onSelect={(a) => setSelectedAvatar(a)}
+                />
+                <VoicePickerDialog
+                  open={voiceDialogOpen}
+                  onOpenChange={setVoiceDialogOpen}
+                  onSelect={(v) =>
+                    setSelectedVoice({ voice_id: v.voice_id, name: v.name })
                   }
-                }}
-              >
-                {creating ? "Creating…" : "Create video"}
-              </Button>
-            ))}
+                />
+                {selectedAvatar &&
+                  selectedVoice &&
+                  (videoStatus === "processing" ||
+                  (videoStatus === "completed" &&
+                    !videoAdded &&
+                    addPhase !== "done") ? (
+                    <div className="mt-3 flex w-full flex-col items-center gap-1">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      <p className="text-xs text-muted-foreground">
+                        {videoStatus === "processing"
+                          ? `Current Status: ${videoStatus}. this can take a few minutes`
+                          : addPhase === "downloading"
+                            ? "Downloading processed video…"
+                            : addPhase === "adding"
+                              ? "Adding video to timeline…"
+                              : "Finalizing…"}
+                      </p>
+                    </div>
+                  ) : videoStatus === "completed" && videoUrl && videoAdded ? (
+                    <Button asChild className="mt-3 w-full" variant="default">
+                      <a
+                        href={videoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download
+                      >
+                        Download video
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button
+                      className="mt-3 w-full"
+                      variant="default"
+                      disabled={
+                        creating || (videoStatus as any) === "processing" || !script
+                      }
+                      onClick={async () => {
+                        if (!selectedAvatar || !selectedVoice || !script)
+                          return;
+                        setVideoStatus("processing");
+                        setActiveTab("pending");
+                        setVideoAdded(false);
+                        setCreating(true);
 
-          <Input
-            placeholder="Existing video ID"
-            value={resumeVideoId}
-            onChange={(e) => setResumeVideoId(e.target.value)}
-          />
+                        try {
+                          if (!projectId) {
+                            throw new Error(
+                              "Project ID is required for HeyGen video creation",
+                            );
+                          }
 
-          <Button
-            variant="secondary"
-            disabled={!resumeVideoId}
-            onClick={() => {
-              if (!resumeVideoId) return;
-              setVideoId(resumeVideoId.trim());
-              setVideoStatus("processing");
-              setVideoUrl(null);
-              setVideoAdded(false);
-              setAddPhase("idle");
-            }}
-          >
-            Resume
-          </Button>
+                          const data: any = await api.heygen.videos.create({
+                            ugc_project_id: projectId,
+                            avatar_pose_id:
+                              selectedAvatar.avatar_id ??
+                              selectedAvatar.avatar_pose_id ??
+                              selectedAvatar.avatarId ??
+                              selectedAvatar.avatar_id,
+                            avatar_style: "normal",
+                            input_text: script,
+                            voice_id: selectedVoice.voice_id,
+                            width,
+                            height,
+                          });
+                          const vid =
+                            data?.data?.heygen_response?.data?.video_id;
+                          if (!vid) {
+                            console.error(
+                              "Full response:",
+                              JSON.stringify(data, null, 2),
+                            );
+                            throw new Error("Missing video_id in response");
+                          }
+                          console.log("Video created", vid);
+                          setVideoId(vid);
+                          setVideoStatus("processing");
+                          setVideoUrl(null);
+                        } catch (err: any) {
+                          alert(err.message ?? "Error");
+                        } finally {
+                          setCreating(false);
+                        }
+                      }}
+                    >
+                      {creating
+                        ? "Creating…"
+                        : (videoStatus as any) === "processing"
+                          ? "Processing…"
+                          : "Create video"}
+                    </Button>
+                  ))}
 
-          {videoStatus === "processing" ||
-          (videoStatus === "completed" &&
-            !videoAdded &&
-            addPhase !== "done") ? (
-            <div className="mt-3 flex w-full flex-col items-center gap-1">
-              {/* <Loader2 className="h-5 w-5 animate-spin text-primary" /> */}
-              {/* <p className="text-xs text-muted-foreground">
-                {videoStatus === "processing"
-                  ? `Current Status: ${videoStatus}. this can take a few minutes`
-                  : addPhase === "downloading"
-                    ? "Downloading processed video…"
-                    : addPhase === "adding"
-                      ? "Adding video to timeline…"
-                      : "Finalizing…"}
-              </p> */}
-            </div>
-          ) : videoStatus === "completed" &&
-            videoUrl &&
-            !videoAdded &&
-            addPhase === "done" ? (
-            <div className="mt-3 flex w-full gap-2">
-              <Button asChild variant="secondary" className="flex-1">
-                <a
-                  href={videoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download
+                <Input
+                  placeholder="Existing video ID"
+                  value={resumeVideoId}
+                  onChange={(e) => setResumeVideoId(e.target.value)}
+                />
+
+                <Button
+                  variant="secondary"
+                  disabled={!resumeVideoId}
+                  onClick={() => {
+                    if (!resumeVideoId) return;
+                    setVideoId(resumeVideoId.trim());
+                    setVideoStatus("processing");
+                    setActiveTab("pending");
+                    setVideoUrl(null);
+                    setVideoAdded(false);
+                    setAddPhase("idle");
+                  }}
                 >
-                  Download
-                </a>
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={handleAddToTimeline}
-                variant="default"
-              >
-                Add to timeline
-              </Button>
-            </div>
-          ) : videoStatus === "completed" && videoUrl && videoAdded ? (
-            // <Button asChild className="mt-3 w-full" variant="default">
-            //   <a
-            //     href={videoUrl}
-            //     target="_blank"
-            //     rel="noopener noreferrer"
-            //     download
-            //   >
-            //     Download video
-            //   </a>
-            // </Button>
-            <div></div>
-          ) : (
-            <></>
-          )}
-        </>
-      )}
+                  Resume
+                </Button>
+
+                {videoStatus === "processing" ||
+                (videoStatus === "completed" &&
+                  !videoAdded &&
+                  addPhase !== "done") ? (
+                  <div className="mt-3 flex w-full flex-col items-center gap-1"></div>
+                ) : videoStatus === "completed" &&
+                  videoUrl &&
+                  !videoAdded &&
+                  addPhase === "done" ? (
+                  <div className="mt-3 flex w-full gap-2">
+                    <Button asChild variant="secondary" className="flex-1">
+                      <a
+                        href={videoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download
+                      >
+                        Download
+                      </a>
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={handleAddToTimeline}
+                      variant="default"
+                    >
+                      Add to timeline
+                    </Button>
+                  </div>
+                ) : videoStatus === "completed" && videoUrl && videoAdded ? (
+                  <div></div>
+                ) : (
+                  <></>
+                )}
+              </>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="pending" className="mt-4">
+          <PendingHeyGenExports projectId={projectId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

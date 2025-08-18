@@ -3,8 +3,10 @@ import { Texts } from "./texts";
 import { Audios } from "./audios";
 import { Elements } from "./elements";
 import ScriptMenu from "../script-menu";
+import Veo3Menu from "../veo3-menu";
 import { Images } from "./images";
 import { Videos } from "./videos";
+import { Library } from "./library"; // added import statement
 
 const ActiveMenuItem = () => {
   const { activeMenuItem } = useLayoutStore();
@@ -31,12 +33,20 @@ const ActiveMenuItem = () => {
     return <ScriptMenu />;
   }
 
+  if (activeMenuItem === "veo3") {
+    return <Veo3Menu />;
+  }
+
+  if (activeMenuItem === "library") {
+    return <Library />;
+  }
+
   return null;
 };
 
 export const MenuItem = () => {
   return (
-    <div className="w-[300px] h-full flex flex-col">
+    <div className="flex h-full w-[300px] flex-col min-h-0">
       <ActiveMenuItem />
     </div>
   );

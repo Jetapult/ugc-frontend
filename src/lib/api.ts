@@ -94,7 +94,11 @@ export async function apiRequest<T = unknown>(
     }
 
     if (!res.ok) {
-      const errorData = data as { detail?: string; error?: string; message?: string };
+      const errorData = data as {
+        detail?: string;
+        error?: string;
+        message?: string;
+      };
       const message =
         errorData?.detail ||
         errorData?.error ||
@@ -166,6 +170,7 @@ export interface UGCExport {
   options_json: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  project_title?: string; // optional project title for display purposes
 }
 
 export interface CreateUGCExportRequest extends Record<string, unknown> {
@@ -180,6 +185,13 @@ export interface CreateUGCExportRequest extends Record<string, unknown> {
     format: string;
     transparent: boolean;
   };
+}
+
+// Upload Types
+export interface UploadItem extends Record<string, unknown> {
+  url: string;
+  filename: string;
+  thumbnail_url: string;
 }
 
 // HeyGen Export Types
@@ -211,6 +223,56 @@ export interface CreateHeyGenExportRequest extends Record<string, unknown> {
     width: number;
     height: number;
   };
+}
+
+// HeyGen Videos API Types
+export interface CreateHeyGenVideoRequest extends Record<string, unknown> {
+  ugc_project_id: string; // Required for tracking
+  input_text: string; // Required: Text to speak
+  voice_id: string; // Required: Voice ID
+  avatar_pose_id?: string; // Optional: Avatar pose
+  avatar_style?: string; // Optional: Avatar style
+  width?: number; // Optional: Video width
+  height?: number; // Optional: Video height
+}
+
+export interface HeyGenVideoResponse extends Record<string, unknown> {
+  success: boolean;
+  data: {
+    export_id: string;
+    heygen_response: {
+      code: number;
+      data: {
+        video_id: string;
+      };
+      msg: string | null;
+      message: string | null;
+    };
+  };
+}
+
+// Veo3 Export Types
+export interface Veo3Export extends Record<string, unknown> {
+  id: string;
+  ugc_project_id: string;
+  user_id: number;
+  prompt: string;
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+  message: string | null;
+  video_url: string | null;
+  veo3_video_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateVeo3ExportRequest extends Record<string, unknown> {
+  ugc_project_id: string;
+  prompt: string;
+  aspect_ratio?: string; // e.g. "16:9" or "9:16"
+  resolution?: string;   // e.g. "1920x1080"
+  audio_prompt?: string; // optional descriptive audio prompt
+  duration?: number;     // desired video duration in seconds
+  seed?: number;         // deterministic seed for generation (0 = random)
 }
 
 export const api = {
@@ -333,6 +395,24 @@ export const api = {
       }),
   },
 
+  // UGC Uploads Listing
+  uploads: {
+    list: (params?: { limit?: number; offset?: number }) => {
+      const search = params
+        ? new URLSearchParams(
+            Object.entries(params).map(([k, v]) => [k, String(v)]),
+          ).toString()
+        : "";
+      return apiRequest<{
+        success: boolean;
+        data: UploadItem[];
+        pagination?: Record<string, unknown>;
+      }>(`${API_ENDPOINTS.ugcUploads}${search ? `?${search}` : ""}`, {
+        auth: true,
+      });
+    },
+  },
+
   // HeyGen Export Management
   heygenExports: {
     list: (params?: {
@@ -415,10 +495,10 @@ export const api = {
         timeoutMs: 300_000, // 5 minutes to accommodate long script generation
       }),
     videos: {
-      create: (body: Record<string, unknown>) =>
-        apiRequest(`${API_ENDPOINTS.heygenVideos}/`, {
+      create: (data: CreateHeyGenVideoRequest): Promise<HeyGenVideoResponse> =>
+        apiRequest<HeyGenVideoResponse>(`${API_ENDPOINTS.heygenVideos}/`, {
           method: "POST",
-          body,
+          body: data,
           auth: true,
         }),
       status: (id: string) =>
@@ -426,6 +506,59 @@ export const api = {
           auth: true,
         }),
     },
+  },
+
+  // Veo3 Export Management
+  veo3Exports: {
+    list: (params?: {
+      ugc_project_id?: string;
+      limit?: number;
+      offset?: number;
+    }) => {
+      const search = new URLSearchParams();
+      if (params?.ugc_project_id) search.set("ugc_project_id", params.ugc_project_id);
+      if (params?.limit) search.set("limit", params.limit.toString());
+      if (params?.offset) search.set("offset", params.offset.toString());
+      const queryString = search.toString();
+      return apiRequest<{
+        success: boolean;
+        data: Veo3Export[];
+      }>(`${API_ENDPOINTS.veo3Exports}${queryString ? `?${queryString}` : ""}`, {
+        auth: true,
+      });
+    },
+    create: (data: CreateVeo3ExportRequest) =>
+      apiRequest<{
+        success: boolean;
+        data: Veo3Export;
+      }>(API_ENDPOINTS.veo3Exports, {
+        method: "POST",
+        body: data,
+        auth: true,
+      }),
+    get: (id: string) =>
+      apiRequest<{
+        success: boolean;
+        data: Veo3Export;
+      }>(API_ENDPOINTS.veo3Export(id), {
+        auth: true,
+      }),
+    update: (id: string, data: Partial<Veo3Export>) =>
+      apiRequest<{
+        success: boolean;
+        data: Veo3Export;
+      }>(API_ENDPOINTS.veo3Export(id), {
+        method: "PATCH",
+        body: data,
+        auth: true,
+      }),
+    delete: (id: string) =>
+      apiRequest<{
+        success: boolean;
+      }>(API_ENDPOINTS.veo3Export(id), {
+        method: "DELETE",
+        auth: true,
+      }),
   },
 
   voices: {
