@@ -251,6 +251,30 @@ export interface HeyGenVideoResponse extends Record<string, unknown> {
   };
 }
 
+// Veo3 Export Types
+export interface Veo3Export extends Record<string, unknown> {
+  id: string;
+  ugc_project_id: string;
+  user_id: number;
+  prompt: string;
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+  message: string | null;
+  video_url: string | null;
+  veo3_video_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateVeo3ExportRequest extends Record<string, unknown> {
+  ugc_project_id: string;
+  prompt: string;
+  aspect_ratio?: string; // e.g. "16:9" or "9:16"
+  resolution?: string;   // e.g. "1920x1080"
+  audio_prompt?: string; // optional descriptive audio prompt
+  duration?: number;     // desired video duration in seconds
+  seed?: number;         // deterministic seed for generation (0 = random)
+}
+
 export const api = {
   request: apiRequest,
   auth: {
@@ -482,6 +506,59 @@ export const api = {
           auth: true,
         }),
     },
+  },
+
+  // Veo3 Export Management
+  veo3Exports: {
+    list: (params?: {
+      ugc_project_id?: string;
+      limit?: number;
+      offset?: number;
+    }) => {
+      const search = new URLSearchParams();
+      if (params?.ugc_project_id) search.set("ugc_project_id", params.ugc_project_id);
+      if (params?.limit) search.set("limit", params.limit.toString());
+      if (params?.offset) search.set("offset", params.offset.toString());
+      const queryString = search.toString();
+      return apiRequest<{
+        success: boolean;
+        data: Veo3Export[];
+      }>(`${API_ENDPOINTS.veo3Exports}${queryString ? `?${queryString}` : ""}`, {
+        auth: true,
+      });
+    },
+    create: (data: CreateVeo3ExportRequest) =>
+      apiRequest<{
+        success: boolean;
+        data: Veo3Export;
+      }>(API_ENDPOINTS.veo3Exports, {
+        method: "POST",
+        body: data,
+        auth: true,
+      }),
+    get: (id: string) =>
+      apiRequest<{
+        success: boolean;
+        data: Veo3Export;
+      }>(API_ENDPOINTS.veo3Export(id), {
+        auth: true,
+      }),
+    update: (id: string, data: Partial<Veo3Export>) =>
+      apiRequest<{
+        success: boolean;
+        data: Veo3Export;
+      }>(API_ENDPOINTS.veo3Export(id), {
+        method: "PATCH",
+        body: data,
+        auth: true,
+      }),
+    delete: (id: string) =>
+      apiRequest<{
+        success: boolean;
+      }>(API_ENDPOINTS.veo3Export(id), {
+        method: "DELETE",
+        auth: true,
+      }),
   },
 
   voices: {

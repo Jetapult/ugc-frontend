@@ -10,6 +10,7 @@ import { useDownloadState } from "./store/use-download-state";
 import AvatarPickerDialog from "@/components/heygen/avatar-picker-dialog";
 import { ADD_VIDEO } from "@designcombo/state";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 
 // Add interface to support video cache on window object
 declare global {
@@ -42,6 +43,8 @@ const ScriptMenu: React.FC = () => {
   const [height, setHeight] = useState(720);
   const [creating, setCreating] = useState(false);
   const [videoId, setVideoId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
   // possible values:
   // - idle: initial state or reset
   // - pending: request has been sent but remote processing hasn’t started
@@ -78,14 +81,32 @@ const ScriptMenu: React.FC = () => {
     if (!file || !file.type.startsWith("video/")) return;
 
     const objectUrl = URL.createObjectURL(file);
+    setIsUploading(true);
+    setUploadProgress(0);
 
     let publicUrl: string;
     try {
+      // Simulate progress during upload
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + Math.random() * 20;
+        });
+      }, 200);
+
       publicUrl = await uploadFile(file);
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
       setUploadedUrl(publicUrl);
     } catch (err) {
       console.error("Upload failed", err);
       URL.revokeObjectURL(objectUrl);
+      setIsUploading(false);
+      setUploadProgress(0);
       return;
     }
 
@@ -115,6 +136,7 @@ const ScriptMenu: React.FC = () => {
         options: { resourceId: "main", scaleMode: "fit" },
       });
       setVideoUploaded(true);
+      setIsUploading(false);
     };
   };
 
@@ -214,9 +236,23 @@ const ScriptMenu: React.FC = () => {
               className="flex gap-1 border border-border"
               variant="outline"
               onClick={handleUploadClick}
+              disabled={isUploading}
             >
-              <PlusIcon size={18} /> Upload video
+              {isUploading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <PlusIcon size={18} />
+              )}
+              {isUploading ? "Uploading..." : "Upload video"}
             </Button>
+            {isUploading && (
+              <div className="flex flex-col gap-2">
+                <Progress value={uploadProgress} className="w-full" />
+                <span className="text-xs text-muted-foreground text-center">
+                  Uploading video... {Math.round(uploadProgress)}%
+                </span>
+              </div>
+            )}
             <input
               ref={fileInputRef}
               type="file"

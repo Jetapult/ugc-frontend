@@ -58,6 +58,10 @@ export const API_ENDPOINTS = {
   heygenExports: "/v1/heygen/exports",
   heygenExport: (id: string) => `/v1/heygen/exports/${id}`,
 
+  // Veo3 Export Management
+  veo3Exports: "/v1/veo3/exports",
+  veo3Export: (id: string) => `/v1/veo3/exports/${id}`,
+
   // HeyGen integration (existing endpoints)
   heygenAvatars: "/v1/heygen/avatars",
   heygenVoices: "/v1/heygen/voices",

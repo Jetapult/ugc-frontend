@@ -6,6 +6,7 @@ interface AuthContextValue {
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  setToken: (token: string) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -32,6 +33,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(null);
   };
 
+  const setTokenDirect = (newToken: string) => {
+    storeToken(newToken);
+    setToken(newToken);
+  };
+
   // keep token in sync if changed in another tab
   useEffect(() => {
     const handler = () => {
@@ -42,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ token, login, logout }}>
+    <AuthContext.Provider value={{ token, login, logout, setToken: setTokenDirect }}>
       {children}
     </AuthContext.Provider>
   );

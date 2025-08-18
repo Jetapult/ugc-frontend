@@ -72,6 +72,21 @@ export default function MenuList() {
       </Button>
       <Button
         onClick={() => {
+          setActiveMenuItem("veo3");
+          setShowMenuItem(true);
+        }}
+        className={cn(
+          showMenuItem && activeMenuItem === "veo3"
+            ? "bg-secondary"
+            : "text-muted-foreground",
+        )}
+        variant={"ghost"}
+        size={"icon"}
+      >
+        <Icons.shapes width={16} />
+      </Button>
+      <Button
+        onClick={() => {
           setActiveMenuItem("library");
           setShowMenuItem(true);
         }}

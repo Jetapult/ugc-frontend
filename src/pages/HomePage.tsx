@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,6 +15,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { api, type ProjectListItem } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import CreateProjectDialog from "../components/CreateProjectDialog";
@@ -28,22 +36,69 @@ export default function HomePage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [projectToDelete, setProjectToDelete] =
     useState<ProjectListItem | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [showTokenErrorDialog, setShowTokenErrorDialog] = useState(false);
   const navigate = useNavigate();
-  const { token, logout } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { token, logout, setToken } = useAuth();
 
   useEffect(() => {
-    if (token) {
+    // Check for token in URL parameters
+    const urlToken = searchParams.get('token');
+    if (urlToken) {
+      handleUrlToken(urlToken);
+    } else if (token) {
       loadProjects();
     }
-  }, [token]);
+  }, [token, searchParams]);
+
+  const handleUrlToken = async (urlToken: string) => {
+    try {
+      setLoading(true);
+      setTokenError(null);
+      
+      // Store the token and update auth context
+      setToken(urlToken);
+      
+      // Test the token by trying to load projects
+      const response = await api.projects.list();
+      if (response.success) {
+        setProjects(response.data);
+        // Remove token from URL after successful authentication
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('token');
+        setSearchParams(newSearchParams, { replace: true });
+      } else {
+        throw new Error('Invalid token - unable to load projects');
+      }
+    } catch (error) {
+      console.error('Token authentication failed:', error);
+      setTokenError('Invalid or expired token. Please try logging in again.');
+      setShowTokenErrorDialog(true);
+      // Clear the invalid token
+      logout();
+      // Remove token from URL
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('token');
+      setSearchParams(newSearchParams, { replace: true });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadProjects = async () => {
     try {
       setLoading(true);
+      setTokenError(null);
       const response = await api.projects.list();
       setProjects(response.data);
     } catch (error) {
       console.error("Failed to load projects:", error);
+      if (error instanceof Error && error.message.includes('401')) {
+        setTokenError('Your session has expired. Please log in again.');
+        setShowTokenErrorDialog(true);
+        logout();
+      }
     } finally {
       setLoading(false);
     }
@@ -95,18 +150,42 @@ export default function HomePage() {
 
   // Show login dialog if not authenticated
   if (!token) {
-    return <LoginDialog />;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <LoginDialog />
+        
+        {/* Token Error Dialog */}
+        <Dialog open={showTokenErrorDialog} onOpenChange={setShowTokenErrorDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-red-600">Authentication Error</DialogTitle>
+              <DialogDescription>
+                {tokenError}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button 
+                onClick={() => setShowTokenErrorDialog(false)}
+                className="w-full"
+              >
+                Continue to Login
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
   }
 
   // Show loading message if token exists but still loading projects
-  if (token && loading) {
+  if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <h1 className="mb-4 text-2xl font-bold text-white">
-            Loading your projects...
-          </h1>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">
+            {searchParams.get('token') ? 'Authenticating...' : 'Loading projects...'}
+          </p>
         </div>
       </div>
     );

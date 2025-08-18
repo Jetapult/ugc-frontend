@@ -13,6 +13,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { dispatch } from "@designcombo/events";
+import { ADD_VIDEO } from "@designcombo/state";
+import { generateId } from "@designcombo/timeline";
+import { IVideo } from "@designcombo/types";
+import { Progress } from "@/components/ui/progress";
+import { Loader2 } from "lucide-react";
 
 interface PendingHeyGenExportsProps {
   projectId?: string | null;
@@ -29,6 +35,103 @@ const PendingHeyGenExports: React.FC<PendingHeyGenExportsProps> = ({ projectId }
   const [exports, setExports] = useState<HeyGenExport[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Track video loading state per export
+  const [loadStates, setLoadStates] = useState<
+    Record<
+      string,
+      {
+        phase: "idle" | "downloading" | "adding" | "done";
+        progress: number;
+      }
+    >
+  >({});
+
+  const addBlobToTimeline = (videoBlob: Blob, exp: HeyGenExport) => {
+    const fileName = `heygen-${exp.id}.mp4`;
+    const videoSrc = exp.video_url.startsWith("https://")
+      ? `https://corsproxy.io/${exp.video_url}`
+      : exp.video_url;
+    const blobUrl = URL.createObjectURL(videoBlob);
+
+    // Mark as adding
+    setLoadStates((s) => ({ ...s, [exp.id]: { phase: "adding", progress: 100 } }));
+
+    const payload: IVideo = {
+      id: generateId(),
+      type: "video",
+      details: {
+        src: videoSrc,
+      } as any,
+      metadata: {
+        previewUrl: blobUrl,
+        name: fileName,
+      },
+    } as any;
+
+    dispatch(ADD_VIDEO, {
+      payload,
+      options: { resourceId: "main", scaleMode: "fit" },
+    });
+
+    // Mark as done
+    setLoadStates((s) => ({ ...s, [exp.id]: { phase: "done", progress: 100 } }));
+  };
+
+  const handleLoadToTimeline = useCallback(
+    async (exp: HeyGenExport) => {
+      if (!exp.video_url) return;
+      const proxiedUrl = exp.video_url.startsWith("https://")
+        ? `https://corsproxy.io/${exp.video_url}`
+        : exp.video_url;
+      const current = loadStates[exp.id];
+      if (current && current.phase !== "idle" && current.phase !== undefined) return;
+
+      // Start downloading
+      setLoadStates((s) => ({ ...s, [exp.id]: { phase: "downloading", progress: 0 } }));
+
+      try {
+        const response = await fetch(proxiedUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to download: ${response.status}`);
+        }
+
+        const contentLength = response.headers.get("content-length");
+        if (response.body && contentLength) {
+          const total = parseInt(contentLength, 10);
+          let received = 0;
+          const reader = response.body.getReader();
+          const chunks: Uint8Array[] = [];
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) {
+              chunks.push(value);
+              received += value.length;
+              const pct = total ? (received / total) * 100 : 0;
+              setLoadStates((s) => ({
+                ...s,
+                [exp.id]: { phase: "downloading", progress: pct },
+              }));
+            }
+          }
+
+          const blob = new Blob(chunks, { type: "video/mp4" });
+          addBlobToTimeline(blob, exp);
+        } else {
+          // Fallback if streaming not supported or no content length
+          const blob = await response.blob();
+          addBlobToTimeline(blob, exp);
+        }
+      } catch (err) {
+        console.error("Failed to load video", err);
+        setLoadStates((s) => ({ ...s, [exp.id]: { phase: "idle", progress: 0 } }));
+        alert((err as Error).message);
+      }
+    },
+    [loadStates],
+  );
 
   const fetchExports = useCallback(async () => {
     if (!projectId) return;
@@ -126,11 +229,40 @@ const PendingHeyGenExports: React.FC<PendingHeyGenExportsProps> = ({ projectId }
               </pre>
 
               {exp.status?.toLowerCase() === "completed" && exp.video_url ? (
-                <Button asChild className="mt-4 w-full" variant="default">
-                  <a href={exp.video_url} target="_blank" rel="noopener noreferrer" download>
-                    Download Video
-                  </a>
-                </Button>
+                <>
+                  {loadStates[exp.id]?.phase === "downloading" ||
+                  loadStates[exp.id]?.phase === "adding" ? (
+                    <div className="mt-4 flex flex-col gap-2">
+                      <Progress value={Math.round(loadStates[exp.id]?.progress ?? 0)} />
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>
+                          {loadStates[exp.id]?.phase === "downloading"
+                            ? `Downloading… ${Math.round(loadStates[exp.id]?.progress ?? 0)}%`
+                            : "Adding video to timeline…"}
+                        </span>
+                      </div>
+                    </div>
+                  ) : loadStates[exp.id]?.phase === "done" ? (
+                    <p className="mt-4 text-sm text-green-500">Video added to timeline ✅</p>
+                  ) : (
+                    <div className="mt-4 flex w-full gap-2">
+                      <Button asChild variant="secondary" className="flex-1">
+                        <a
+                          href={exp.video_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                        >
+                          Download Video
+                        </a>
+                      </Button>
+                      <Button className="flex-1" onClick={() => handleLoadToTimeline(exp)}>
+                        Load to Timeline
+                      </Button>
+                    </div>
+                  )}
+                </>
               ) : null}
             </DialogContent>
           </Dialog>

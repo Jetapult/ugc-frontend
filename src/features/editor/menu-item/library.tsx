@@ -5,6 +5,8 @@ import { api, type UploadItem } from "@/lib/api";
 import { dispatch } from "@designcombo/events";
 import { ADD_VIDEO } from "@designcombo/state";
 import { generateId } from "@designcombo/timeline";
+import { Progress } from "@/components/ui/progress";
+import { Loader2 } from "lucide-react";
 import { IVideo } from "@designcombo/types";
 import { useIsDraggingOverTimeline } from "../hooks/is-dragging-over-timeline";
 
@@ -62,11 +64,11 @@ export const Library = () => {
   };
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col min-h-0">
       <div className="text-text-primary flex h-12 flex-none items-center px-4 text-sm font-medium">
         Library
       </div>
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <div className="grid grid-cols-2 gap-4 px-4">
           {uploads.map((item, idx) => (
             <UploadItemComponent
@@ -111,11 +113,12 @@ export const Library = () => {
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 };
 
+// --- Upload card with download progress ---
 const UploadItemComponent = ({
   upload,
   shouldDisplayPreview,
@@ -125,7 +128,10 @@ const UploadItemComponent = ({
   shouldDisplayPreview: boolean;
   handleAddVideo: (payload: Partial<IVideo>) => void;
 }) => {
-  const [adding, setAdding] = React.useState(false);
+  const [loadState, setLoadState] = React.useState<{ phase: "idle" | "downloading" | "adding" | "done"; progress: number }>({
+    phase: "idle",
+    progress: 0,
+  });
 
   const style = React.useMemo(
     () => ({
@@ -136,6 +142,70 @@ const UploadItemComponent = ({
     }),
     [upload.thumbnail_url],
   );
+
+  const handleClick = async () => {
+    if (loadState.phase !== "idle") return;
+    const proxiedUrl = upload.url.startsWith("https://")
+      ? `https://corsproxy.io/${upload.url}`
+      : upload.url;
+    try {
+      setLoadState({ phase: "downloading", progress: 0 });
+      const response = await fetch(proxiedUrl);
+      if (!response.ok) throw new Error(`Failed: ${response.status}`);
+      const total = Number(response.headers.get("content-length"));
+      if (response.body && total) {
+        const reader = response.body.getReader();
+        let received = 0;
+        const chunks: Uint8Array[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            chunks.push(value);
+            received += value.length;
+            setLoadState({ phase: "downloading", progress: Math.round((received / total) * 100) });
+          }
+        }
+        const blob = new Blob(chunks, { type: "video/mp4" });
+        const blobUrl = URL.createObjectURL(blob);
+        setLoadState({ phase: "adding", progress: 100 });
+        dispatch(ADD_VIDEO, {
+          payload: {
+            id: generateId(),
+            details: { src: proxiedUrl },
+            metadata: { previewUrl: blobUrl },
+          },
+          options: {
+            resourceId: "main",
+            scaleMode: "fit",
+          },
+        });
+        setLoadState({ phase: "done", progress: 100 });
+        setTimeout(() => setLoadState({ phase: "idle", progress: 0 }), 1500);
+      } else {
+        // Fallback simple
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        setLoadState({ phase: "adding", progress: 100 });
+        dispatch(ADD_VIDEO, {
+          payload: {
+            id: generateId(),
+            details: { src: proxiedUrl },
+            metadata: { previewUrl: blobUrl },
+          },
+          options: {
+            resourceId: "main",
+            scaleMode: "fit",
+          },
+        });
+        setLoadState({ phase: "done", progress: 100 });
+        setTimeout(() => setLoadState({ phase: "idle", progress: 0 }), 1500);
+      }
+    } catch (err) {
+      alert((err as Error).message);
+      setLoadState({ phase: "idle", progress: 0 });
+    }
+  };
 
   return (
     <Draggable
@@ -148,17 +218,8 @@ const UploadItemComponent = ({
       shouldDisplayPreview={shouldDisplayPreview}
     >
       <div
-        className={`relative flex aspect-[9/16] w-full items-center justify-center overflow-hidden rounded-md border bg-background ${adding ? "border-primary ring-2 ring-primary" : "border-border/60"}`}
-        onClick={() => {
-          if (adding) return;
-          setAdding(true);
-          handleAddVideo({
-            id: generateId(),
-            details: { src: upload.url },
-            metadata: { previewUrl: upload.thumbnail_url },
-          } as any);
-          setTimeout(() => setAdding(false), 1000);
-        }}
+        className={`relative flex aspect-[9/16] w-full items-center justify-center overflow-hidden rounded-md border bg-background ${loadState.phase !== "idle" ? "border-primary ring-2 ring-primary" : "border-border/60"}`}
+        onClick={handleClick}
       >
         <img
           draggable={false}
@@ -166,28 +227,18 @@ const UploadItemComponent = ({
           className="h-full w-full object-contain"
           alt={upload.filename}
         />
-        {adding && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-            <svg
-              className="h-6 w-6 animate-spin text-white"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-              ></path>
-            </svg>
+        {loadState.phase !== "idle" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm">
+            {loadState.phase === "downloading" && (
+              <>
+                <Progress value={loadState.progress} className="w-2/3 h-2" />
+                <span className="mt-1 text-xs text-white">{loadState.progress}%</span>
+              </>
+            )}
+            {loadState.phase === "adding" && <Loader2 className="h-5 w-5 animate-spin text-white" />}
+            {loadState.phase === "done" && (
+              <span className="text-xs font-medium text-green-400">Added</span>
+            )}
           </div>
         )}
       </div>
