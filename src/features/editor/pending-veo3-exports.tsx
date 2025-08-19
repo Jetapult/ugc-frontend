@@ -37,6 +37,7 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
       }
     >
   >({});
+  const [refreshingExport, setRefreshingExport] = useState<string | null>(null);
 
   const fetchExports = useCallback(async () => {
     if (!projectId) return;
@@ -57,6 +58,23 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
       setLoading(false);
     }
   }, [projectId]);
+
+  const handleHardRefresh = useCallback(async (exportId: string) => {
+    setRefreshingExport(exportId);
+    try {
+      const response = await api.veo3Exports.get(exportId);
+      if (response.success) {
+        // Update the specific export in the list
+        setExports(prev => prev.map(exp => 
+          exp.id === exportId ? response.data : exp
+        ));
+      }
+    } catch (err) {
+      console.error("Failed to refresh export:", err);
+    } finally {
+      setRefreshingExport(null);
+    }
+  }, []);
 
   useEffect(() => {
     fetchExports();
@@ -159,7 +177,7 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
   }
 
   return (
-    <div className="flex flex-1 flex-col min-h-0">
+    <div className="flex flex-1 flex-col h-full">
       <div className="flex items-center justify-between px-4 py-2 border-b">
         <h3 className="text-sm font-medium">Veo3 Video Exports</h3>
         <Button
@@ -195,120 +213,126 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
               const isCompleted = exp.status === "COMPLETED" && exp.video_url;
 
               return (
-                <Card key={exp.id}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-sm">Veo3 Video</CardTitle>
-                        <CardDescription className="text-xs mt-1">
-                          {new Date(exp.created_at).toLocaleString()}
-                        </CardDescription>
-                      </div>
-                      <Badge variant={statusVariantMap[exp.status.toLowerCase()]}>
-                        {exp.status}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-3">
-                      <div className="text-xs text-muted-foreground">
-                        <strong>Prompt:</strong> {exp.prompt}
-                      </div>
-
-                      {exp.message && (
-                        <div className="text-xs text-muted-foreground">
-                          <strong>Message:</strong> {exp.message}
+                <Dialog key={exp.id}>
+                  <DialogTrigger asChild>
+                    <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-sm">Veo3 Video</CardTitle>
+                            <CardDescription className="text-xs mt-1">
+                              {new Date(exp.created_at).toLocaleString()}
+                            </CardDescription>
+                          </div>
+                          <Badge variant={statusVariantMap[exp.status.toLowerCase()]}>
+                            {exp.status}
+                          </Badge>
                         </div>
-                      )}
-
-                      {isCompleted && (
-                        <Dialog>
-                          <div className="flex gap-2">
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="flex-1">
-                                <ExternalLink className="mr-2 h-3 w-3" />
-                                Download Video
-                              </Button>
-                            </DialogTrigger>
-
-                            {loadState.phase === "idle" && (
-                              <Button
-                                onClick={() => handleLoadToTimeline(exp)}
-                                size="sm"
-                                className="flex-1"
-                              >
-                                <Plus className="mr-2 h-3 w-3" />
-                                Load to Timeline
-                              </Button>
-                            )}
-
-                            {loadState.phase === "downloading" && (
-                              <div className="flex-1 space-y-1">
-                                <div className="flex items-center justify-between text-xs">
-                                  <span>Downloading...</span>
-                                  <span>{loadState.progress}%</span>
-                                </div>
-                                <Progress value={loadState.progress} className="h-2" />
-                              </div>
-                            )}
-
-                            {loadState.phase === "adding" && (
-                              <div className="flex-1 flex items-center justify-center">
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                <span className="text-sm">Adding to timeline...</span>
-                              </div>
-                            )}
-
-                            {loadState.phase === "done" && (
-                              <div className="flex-1 flex items-center justify-center text-green-600">
-                                <span className="text-sm font-medium">Added to timeline!</span>
-                              </div>
-                            )}
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-3">
+                          <div className="text-xs text-muted-foreground">
+                            <strong>Prompt:</strong> {exp.prompt}
                           </div>
 
-                          <DialogContent className="max-w-2xl">
-                            <DialogHeader>
-                              <DialogTitle>Veo3 Video Export</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div>
-                                <strong>Prompt:</strong>
-                                <p className="text-sm text-muted-foreground mt-1">{exp.prompt}</p>
-                              </div>
-                              <div>
-                                <strong>Status:</strong>
-                                <Badge className="ml-2" variant={statusVariantMap[exp.status.toLowerCase()]}>
-                                  {exp.status}
-                                </Badge>
-                              </div>
-                              <div>
-                                <strong>Created:</strong>
-                                <span className="ml-2 text-sm">{new Date(exp.created_at).toLocaleString()}</span>
-                              </div>
-                              {exp.video_url && (
-                                <div className="space-y-2">
-                                  <strong>Video:</strong>
-                                  <div className="flex gap-2">
-                                    <Button asChild variant="outline">
-                                      <a href={exp.video_url} target="_blank" rel="noopener noreferrer">
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Download Video
-                                      </a>
-                                    </Button>
-                                    <Button onClick={() => handleLoadToTimeline(exp)}>
-                                      <Plus className="mr-2 h-4 w-4" />
-                                      Load to Timeline
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
+                          {exp.message && (
+                            <div className="text-xs text-muted-foreground">
+                              <strong>Message:</strong> {exp.message}
                             </div>
-                          </DialogContent>
-                        </Dialog>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Veo3 Video Export Details</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <strong>Prompt:</strong>
+                        <p className="text-sm text-muted-foreground mt-1">{exp.prompt}</p>
+                      </div>
+                      <div>
+                        <strong>Status:</strong>
+                        <Badge className="ml-2" variant={statusVariantMap[exp.status.toLowerCase()]}>
+                          {exp.status}
+                        </Badge>
+                      </div>
+                      <div>
+                        <strong>Created:</strong>
+                        <span className="ml-2 text-sm">{new Date(exp.created_at).toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <strong>Updated:</strong>
+                        <span className="ml-2 text-sm">{new Date(exp.updated_at).toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <strong>Aspect Ratio:</strong>
+                        <span className="ml-2 text-sm">{(exp as any).aspect_ratio || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <strong>Resolution:</strong>
+                        <span className="ml-2 text-sm">{(exp as any).resolution || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <strong>Duration:</strong>
+                        <span className="ml-2 text-sm">{(exp as any).duration || 'N/A'} seconds</span>
+                      </div>
+                      {(exp as any).fal_request_id && (
+                        <div>
+                          <strong>FAL Request ID:</strong>
+                          <span className="ml-2 text-sm font-mono">{(exp as any).fal_request_id}</span>
+                        </div>
+                      )}
+                      {(exp as any).error_message && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                          <strong className="text-red-800">Error:</strong>
+                          <p className="text-sm text-red-700 mt-1">{(exp as any).error_message}</p>
+                        </div>
+                      )}
+                      {exp.status.toLowerCase() === "processing" && (
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleHardRefresh(exp.id)}
+                            disabled={refreshingExport === exp.id}
+                          >
+                            {refreshingExport === exp.id ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Refreshing...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Hard Refresh
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                      {exp.video_url && (
+                        <div className="space-y-2">
+                          <strong>Video:</strong>
+                          <div className="flex gap-2">
+                            <Button asChild variant="outline">
+                              <a href={exp.video_url} target="_blank" rel="noopener noreferrer">
+                                <Download className="mr-2 h-4 w-4" />
+                                Download Video
+                              </a>
+                            </Button>
+                            <Button onClick={() => handleLoadToTimeline(exp)}>
+                              <Plus className="mr-2 h-4 w-4" />
+                              Load to Timeline
+                            </Button>
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
+                  </DialogContent>
+                </Dialog>
               );
             })}
           </div>

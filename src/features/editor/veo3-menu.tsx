@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Send, Sparkles } from "lucide-react";
+import { Loader2, Send, Sparkles, CheckCircle, XCircle } from "lucide-react";
 import { api, type CreateVeo3ExportRequest } from "@/lib/api";
 import { useDownloadState } from "./store/use-download-state";
 import PendingVeo3Exports from "./pending-veo3-exports";
@@ -17,6 +17,11 @@ const Veo3Menu: React.FC = () => {
   const [prompt, setPrompt] = useState(DEFAULT_GAMEPLAY_PROMPT);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("generate");
+  const [notification, setNotification] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -48,16 +53,29 @@ const Veo3Menu: React.FC = () => {
       if (response.success) {
         // Clear the form on success
         setPrompt("");
-        // Success feedback could be added here
+        // Show success notification and switch to pending tab
+        setNotification({
+          type: "success",
+          message: "Video generation started successfully! Check the pending videos tab."
+        });
+        setActiveTab("pending");
+        // Auto-hide notification after 5 seconds
+        setTimeout(() => setNotification(null), 5000);
         console.log("Veo3 video generation started:", response.data);
       } else {
-        setError("Failed to start video generation");
+        setNotification({
+          type: "error",
+          message: "Failed to start video generation. Please try again."
+        });
+        setTimeout(() => setNotification(null), 5000);
       }
     } catch (err) {
       console.error("Veo3 generation error:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to generate video"
-      );
+      setNotification({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to generate video"
+      });
+      setTimeout(() => setNotification(null), 5000);
     } finally {
       setIsGenerating(false);
     }
@@ -70,7 +88,23 @@ const Veo3Menu: React.FC = () => {
         Veo3 AI Video
       </div>
 
-      <Tabs defaultValue="generate" className="flex-1 flex flex-col min-h-0">
+      {/* Notification */}
+      {notification && (
+        <div className={`mx-4 mb-3 p-3 rounded-md border flex items-center gap-2 ${
+          notification.type === "success" 
+            ? "bg-green-50 border-green-200 text-green-800" 
+            : "bg-red-50 border-red-200 text-red-800"
+        }`}>
+          {notification.type === "success" ? (
+            <CheckCircle className="h-4 w-4 flex-shrink-0" />
+          ) : (
+            <XCircle className="h-4 w-4 flex-shrink-0" />
+          )}
+          <span className="text-sm">{notification.message}</span>
+        </div>
+      )}
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
         <TabsList className="mx-4 mb-3">
           <TabsTrigger value="generate">Generate Video</TabsTrigger>
           <TabsTrigger value="pending">Pending Videos</TabsTrigger>
