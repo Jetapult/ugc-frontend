@@ -42,9 +42,9 @@ const ScriptMenu: React.FC = () => {
   const [width, setWidth] = useState(1280);
   const [height, setHeight] = useState(720);
   const [creating, setCreating] = useState(false);
-  const [videoId, setVideoId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [scriptError, setScriptError] = useState<string | null>(null);
   // possible values:
   // - idle: initial state or reset
   // - pending: request has been sent but remote processing hasn’t started
@@ -56,7 +56,6 @@ const ScriptMenu: React.FC = () => {
   >("idle");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoAdded, setVideoAdded] = useState(false);
-  const [resumeVideoId, setResumeVideoId] = useState("");
   // tab navigation state
   const [activeTab, setActiveTab] = useState<"generate" | "pending">(
     "generate",
@@ -148,7 +147,7 @@ const ScriptMenu: React.FC = () => {
       setAddPhase("done");
       return;
     }
-  }, [videoStatus, videoUrl, videoAdded, videoId]);
+  }, [videoStatus, videoUrl, videoAdded]);
 
   // Manually download + add to timeline on button click
   const handleAddToTimeline = async () => {
@@ -164,7 +163,7 @@ const ScriptMenu: React.FC = () => {
       }
 
       const videoBlob = await response.blob();
-      const fileName = `heygen-${videoId ?? Date.now()}.mp4`;
+      const fileName = `heygen-${Date.now()}.mp4`;
 
       // Create blob URL for the video
       const blobUrl = URL.createObjectURL(videoBlob);
@@ -173,7 +172,7 @@ const ScriptMenu: React.FC = () => {
       if (!window.videoCache) {
         window.videoCache = {};
       }
-      window.videoCache[videoId || "current"] = {
+      window.videoCache["current"] = {
         url: blobUrl,
         blob: videoBlob,
       };
@@ -236,7 +235,7 @@ const ScriptMenu: React.FC = () => {
               className="flex gap-1 border border-border"
               variant="outline"
               onClick={handleUploadClick}
-              disabled={isUploading}
+              disabled={isUploading || generating}
             >
               {isUploading ? (
                 <Loader2 size={18} className="animate-spin" />
@@ -268,6 +267,7 @@ const ScriptMenu: React.FC = () => {
                   value={context}
                   onChange={(e) => setContext(e.target.value)}
                   className="min-h-[80px] text-xs"
+                  disabled={generating}
                 />
                 <Button
                   variant="default"
@@ -275,15 +275,29 @@ const ScriptMenu: React.FC = () => {
                   onClick={async () => {
                     if (!uploadedUrl) return;
                     setGenerating(true);
+                    setScriptError(null);
                     try {
                       const data: any = await api.heygen.generateScript({
-                        url: uploadedUrl,
-                        context,
+                        studio_id: '1',
+                        user_id: '1', 
+                        query_text: '',
+                        context: context || '',
+                        media_file: '',
+                        media_url: uploadedUrl,
+                        creative_gallery_id: ''
                       });
+                      
+                      if (data.success === false) {
+                        setScriptError(data.message || 'Script generation failed');
+                        return;
+                      }
+                      
                       const text = data?.script ?? data?.text ?? data;
                       setScript(String(text));
-                    } catch (err) {
+                    } catch (err: any) {
                       console.error(err);
+                      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to generate script';
+                      setScriptError(errorMessage);
                     } finally {
                       setGenerating(false);
                     }
@@ -291,6 +305,12 @@ const ScriptMenu: React.FC = () => {
                 >
                   {generating ? "Generating…" : "Generate script"}
                 </Button>
+                
+                {scriptError && (
+                  <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+                    {scriptError}
+                  </div>
+                )}
               </div>
             )}
 
@@ -303,14 +323,15 @@ const ScriptMenu: React.FC = () => {
                 />
                 <div className="mt-2 grid w-full grid-cols-2 gap-2">
                   <Button
-                    variant="secondary"
+                    variant="outline"
                     className="w-full"
                     onClick={() => setAvatarDialogOpen(true)}
+                    disabled={isUploading || generating}
                   >
                     {selectedAvatar ? "Change avatar" : "Select avatar"}
                   </Button>
                   <Button
-                    variant="secondary"
+                    variant="outline"
                     className="w-full"
                     onClick={() => setVoiceDialogOpen(true)}
                   >
@@ -440,7 +461,6 @@ const ScriptMenu: React.FC = () => {
                             throw new Error("Missing video_id in response");
                           }
                           console.log("Video created", vid);
-                          setVideoId(vid);
                           setVideoStatus("processing");
                           setVideoUrl(null);
                         } catch (err: any) {
@@ -458,27 +478,6 @@ const ScriptMenu: React.FC = () => {
                     </Button>
                   ))}
 
-                <Input
-                  placeholder="Existing video ID"
-                  value={resumeVideoId}
-                  onChange={(e) => setResumeVideoId(e.target.value)}
-                />
-
-                <Button
-                  variant="secondary"
-                  disabled={!resumeVideoId}
-                  onClick={() => {
-                    if (!resumeVideoId) return;
-                    setVideoId(resumeVideoId.trim());
-                    setVideoStatus("processing");
-                    setActiveTab("pending");
-                    setVideoUrl(null);
-                    setVideoAdded(false);
-                    setAddPhase("idle");
-                  }}
-                >
-                  Resume
-                </Button>
 
                 {videoStatus === "processing" ||
                 (videoStatus === "completed" &&
