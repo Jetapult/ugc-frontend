@@ -224,9 +224,87 @@ const PendingHeyGenExports: React.FC<PendingHeyGenExportsProps> = ({ projectId }
                 </DialogDescription>
               </DialogHeader>
 
-              <pre className="max-h-96 overflow-auto rounded-md bg-muted p-4 text-xs">
+              <div className="max-h-96 overflow-auto rounded-md bg-muted p-4">
+                <div className="space-y-3 text-sm">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="font-semibold text-foreground">ID:</span>
+                      <p className="text-xs text-muted-foreground font-mono">{exp.id}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-foreground">Status:</span>
+                      <p className="text-xs"><Badge variant={statusVariant}>{exp.status?.toUpperCase()}</Badge></p>
+                    </div>
+                  </div>
+                  
+                  {exp.heygen_video_id && (
+                    <div>
+                      <span className="font-semibold text-foreground">HeyGen Video ID:</span>
+                      <p className="text-xs text-muted-foreground font-mono">{exp.heygen_video_id}</p>
+                    </div>
+                  )}
+                  
+                  {exp.dimensions && (
+                    <div>
+                      <span className="font-semibold text-foreground">Dimensions:</span>
+                      <p className="text-xs text-muted-foreground">{exp.dimensions.width} × {exp.dimensions.height}</p>
+                    </div>
+                  )}
+                  
+                  {exp.prompt && (
+                    <div>
+                      <span className="font-semibold text-foreground">Script:</span>
+                      <div className="mt-1 max-h-32 overflow-auto rounded border bg-background p-2 text-xs text-muted-foreground">
+                        {exp.prompt}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {exp.message && (
+                    <div>
+                      <span className="font-semibold text-foreground">Message:</span>
+                      <div className="mt-1 max-h-32 overflow-auto rounded border bg-background p-2 text-xs">
+                        {(() => {
+                          try {
+                            const parsed = JSON.parse(exp.message);
+                            return (
+                              <div className="space-y-2">
+                                {parsed.error && (
+                                  <div className="text-red-600">
+                                    <div className="font-semibold">{parsed.error.code}</div>
+                                    <div className="text-xs">{parsed.error.message}</div>
+                                  </div>
+                                )}
+                                {parsed.status && (
+                                  <div>
+                                    <span className="font-medium">Status:</span> {parsed.status}
+                                  </div>
+                                )}
+                                {parsed.duration && (
+                                  <div>
+                                    <span className="font-medium">Duration:</span> {parsed.duration}s
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          } catch {
+                            return <div className="text-muted-foreground">{exp.message}</div>;
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                      Show raw JSON
+                    </summary>
+                    <pre className="mt-2 max-h-48 overflow-auto rounded border bg-background p-2 text-xs text-muted-foreground">
 {JSON.stringify(exp, null, 2)}
-              </pre>
+                    </pre>
+                  </details>
+                </div>
+              </div>
 
               {exp.status?.toLowerCase() === "completed" && exp.video_url ? (
                 <>
