@@ -69,50 +69,85 @@ export const Library = () => {
         Library
       </div>
       <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-2 gap-4 px-4">
-          {uploads.map((item, idx) => (
-            <UploadItemComponent
-              key={idx}
-              upload={item}
-              shouldDisplayPreview={!isDraggingOverTimeline}
-              handleAddVideo={handleAddVideo}
-            />
-          ))}
-          {hasMore && (
-            <div className="my-4 flex w-full justify-center">
-              <button
-                disabled={loading}
-                onClick={fetchUploads}
-                className="inline-flex items-center gap-1 text-xs font-medium text-primary underline disabled:opacity-50"
-              >
-                {loading ? (
-                  <svg
-                    className="h-4 w-4 animate-spin text-primary"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                    ></path>
-                  </svg>
-                ) : (
-                  "Load more"
-                )}
-              </button>
+        {uploads.length === 0 && !loading ? (
+          <div className="flex flex-col items-center justify-center h-full px-4 py-8">
+            <div className="text-center">
+              <div className="mb-4">
+                <svg
+                  className="mx-auto h-12 w-12 text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1}
+                    d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2h4a1 1 0 110 2h-1v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6H3a1 1 0 110-2h4zM6 6v14h12V6H6zm3-2V3h6v1H9z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1}
+                    d="M12 8v4m0 4h.01"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-sm font-medium text-text-primary mb-1">
+                No videos in library
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Upload videos to get started with your project
+              </p>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 px-4">
+            {uploads.map((item, idx) => (
+              <UploadItemComponent
+                key={idx}
+                upload={item}
+                shouldDisplayPreview={!isDraggingOverTimeline}
+                handleAddVideo={handleAddVideo}
+              />
+            ))}
+            {hasMore && (
+              <div className="my-4 flex w-full justify-center">
+                <button
+                  disabled={loading}
+                  onClick={fetchUploads}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-primary underline disabled:opacity-50"
+                >
+                  {loading ? (
+                    <svg
+                      className="h-4 w-4 animate-spin text-primary"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                      ></path>
+                    </svg>
+                  ) : (
+                    "Load more"
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

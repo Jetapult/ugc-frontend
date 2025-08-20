@@ -293,7 +293,13 @@ const ScriptMenu: React.FC = () => {
                       }
                       
                       const text = data?.script ?? data?.text ?? data;
-                      setScript(String(text));
+                      const scriptText = String(text);
+                      
+                      if (scriptText.length > 500) {
+                        setScriptError(`Generated script is ${scriptText.length} characters (limit: 500). Please use a shorter video to avoid generation failures.`);
+                      }
+                      
+                      setScript(scriptText);
                     } catch (err: any) {
                       console.error(err);
                       const errorMessage = err?.response?.data?.message || err?.message || 'Failed to generate script';
@@ -316,11 +322,23 @@ const ScriptMenu: React.FC = () => {
 
             {script !== null && (
               <>
-                <Textarea
-                  value={script}
-                  onChange={(e) => setScript(e.target.value)}
-                  className="min-h-[140px] w-full text-xs"
-                />
+                <div className="space-y-2">
+                  <Textarea
+                    value={script}
+                    onChange={(e) => setScript(e.target.value)}
+                    className="min-h-[140px] w-full text-xs"
+                  />
+                  <div className="flex items-center justify-between text-xs">
+                    <span className={`${script.length > 500 ? 'text-orange-600' : 'text-muted-foreground'}`}>
+                      {script.length}/500 characters
+                    </span>
+                    {script.length > 500 && (
+                      <span className="text-orange-600 font-medium">
+                        ⚠️ May exceed video length limits
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <div className="mt-2 grid w-full grid-cols-2 gap-2">
                   <Button
                     variant="outline"
