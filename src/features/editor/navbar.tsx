@@ -14,7 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ChevronDown, Download, PlusIcon } from "lucide-react";
+import { ChevronDown, Download, PlusIcon, Save } from "lucide-react";
 import UGCExportsDialog from "./ugc-exports-dialog";
 import { Label } from "@/components/ui/label";
 import type StateManager from "@designcombo/state";
@@ -217,7 +217,7 @@ export default function Navbar({
             {saving ? (
               <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-green-400" />
             ) : (
-              <span className="text-sm">💾</span>
+              <Save width={18} />
             )}
             {saving ? "Saving..." : "Save"}
           </Button>
