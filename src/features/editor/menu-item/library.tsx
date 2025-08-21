@@ -49,11 +49,6 @@ export const Library = () => {
   }, []);
 
   const handleAddVideo = (payload: Partial<IVideo>) => {
-    if (payload.details?.src && payload.details.src.startsWith("https://")) {
-      payload.details.src =
-        `https://corsproxy.io/${payload.details.src}` as any;
-    }
-
     dispatch(ADD_VIDEO, {
       payload,
       options: {
@@ -180,12 +175,9 @@ const UploadItemComponent = ({
 
   const handleClick = async () => {
     if (loadState.phase !== "idle") return;
-    const proxiedUrl = upload.url.startsWith("https://")
-      ? `https://corsproxy.io/${upload.url}`
-      : upload.url;
     try {
       setLoadState({ phase: "downloading", progress: 0 });
-      const response = await fetch(proxiedUrl);
+      const response = await fetch(upload.url);
       if (!response.ok) throw new Error(`Failed: ${response.status}`);
       const total = Number(response.headers.get("content-length"));
       if (response.body && total) {
@@ -207,7 +199,7 @@ const UploadItemComponent = ({
         dispatch(ADD_VIDEO, {
           payload: {
             id: generateId(),
-            details: { src: proxiedUrl },
+            details: { src: upload.url },
             metadata: { previewUrl: blobUrl },
           },
           options: {
@@ -225,7 +217,7 @@ const UploadItemComponent = ({
         dispatch(ADD_VIDEO, {
           payload: {
             id: generateId(),
-            details: { src: proxiedUrl },
+            details: { src: upload.url },
             metadata: { previewUrl: blobUrl },
           },
           options: {

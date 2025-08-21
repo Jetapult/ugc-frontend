@@ -49,9 +49,6 @@ const PendingHeyGenExports: React.FC<PendingHeyGenExportsProps> = ({ projectId }
 
   const addBlobToTimeline = (videoBlob: Blob, exp: HeyGenExport) => {
     const fileName = `heygen-${exp.id}.mp4`;
-    const videoSrc = exp.video_url.startsWith("https://")
-      ? `https://corsproxy.io/${exp.video_url}`
-      : exp.video_url;
     const blobUrl = URL.createObjectURL(videoBlob);
 
     // Mark as adding
@@ -61,7 +58,7 @@ const PendingHeyGenExports: React.FC<PendingHeyGenExportsProps> = ({ projectId }
       id: generateId(),
       type: "video",
       details: {
-        src: videoSrc,
+        src: exp.video_url,
       } as any,
       metadata: {
         previewUrl: blobUrl,
@@ -81,9 +78,6 @@ const PendingHeyGenExports: React.FC<PendingHeyGenExportsProps> = ({ projectId }
   const handleLoadToTimeline = useCallback(
     async (exp: HeyGenExport) => {
       if (!exp.video_url) return;
-      const proxiedUrl = exp.video_url.startsWith("https://")
-        ? `https://corsproxy.io/${exp.video_url}`
-        : exp.video_url;
       const current = loadStates[exp.id];
       if (current && current.phase !== "idle" && current.phase !== undefined) return;
 
@@ -91,7 +85,7 @@ const PendingHeyGenExports: React.FC<PendingHeyGenExportsProps> = ({ projectId }
       setLoadStates((s) => ({ ...s, [exp.id]: { phase: "downloading", progress: 0 } }));
 
       try {
-        const response = await fetch(proxiedUrl);
+        const response = await fetch(exp.video_url);
         if (!response.ok) {
           throw new Error(`Failed to download: ${response.status}`);
         }

@@ -17,11 +17,6 @@ export const Videos = () => {
     console.log("handle add video");
     console.log(payload);
 
-    // Ensure cross-origin videos load in OffthreadVideo – add CORS proxy if needed
-    if (payload.details?.src && payload.details.src.startsWith("https://")) {
-      payload.details.src = `https://corsproxy.io/${payload.details.src}` as any;
-    }
-
     dispatch(ADD_VIDEO, {
       payload,
       options: {

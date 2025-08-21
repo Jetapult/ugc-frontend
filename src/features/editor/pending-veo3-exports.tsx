@@ -83,16 +83,13 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
   const handleLoadToTimeline = useCallback(
     async (exp: Veo3Export) => {
       if (!exp.video_url) return;
-      const proxiedUrl = exp.video_url.startsWith("https://")
-        ? `https://corsproxy.io/${exp.video_url}`
-        : exp.video_url;
       const current = loadStates[exp.id];
       if (current && current.phase !== "idle" && current.phase !== undefined) return;
 
       try {
         setLoadStates((s) => ({ ...s, [exp.id]: { phase: "downloading", progress: 0 } }));
 
-        const response = await fetch(proxiedUrl);
+        const response = await fetch(exp.video_url);
         if (!response.ok) {
           throw new Error(`Failed to download: ${response.status}`);
         }
@@ -125,7 +122,7 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
           dispatch(ADD_VIDEO, {
             payload: {
               id: generateId(),
-              details: { src: proxiedUrl },
+              details: { src: exp.video_url },
               metadata: { previewUrl: blobUrl },
             },
             options: { resourceId: "main", scaleMode: "fit" },
@@ -146,7 +143,7 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
           dispatch(ADD_VIDEO, {
             payload: {
               id: generateId(),
-              details: { src: proxiedUrl },
+              details: { src: exp.video_url },
               metadata: { previewUrl: blobUrl },
             },
             options: { resourceId: "main", scaleMode: "fit" },
