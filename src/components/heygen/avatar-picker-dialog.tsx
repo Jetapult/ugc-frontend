@@ -43,7 +43,7 @@ const AvatarPickerDialog: React.FC<Props> = ({
   const [search, setSearch] = useState("");
   const [gender, setGender] = useState<string | "">("");
   const [premium, setPremium] = useState<string | "">("");
-  const [transparent, setTransparent] = useState<string | "">("true");
+  const [transparent, setTransparent] = useState<boolean>(true);
   const [loading, setLoading] = useState(false);
 
   const fetchAvatars = useCallback(async () => {
@@ -55,7 +55,7 @@ const AvatarPickerDialog: React.FC<Props> = ({
         ...(search ? { search } : {}),
         ...(gender ? { gender } : {}),
         ...(premium ? { premium } : {}),
-        ...(transparent ? { transparent } : {}),
+        transparent,
       } as Record<string, string | number | boolean>;
 
       const data: any = await api.heygen.avatars(params);
@@ -134,15 +134,15 @@ const AvatarPickerDialog: React.FC<Props> = ({
             <option value="true">Premium</option>
             <option value="false">Free</option>
           </select>
-          <select
-            value={transparent}
-            onChange={(e) => setTransparent(e.target.value)}
-            className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
-          >
-            <option value="">Any background</option>
-            <option value="true">Transparent</option>
-            <option value="false">Solid background</option>
-          </select>
+          <label className="flex items-center gap-2 text-sm h-9">
+            <input
+              type="checkbox"
+              checked={transparent}
+              onChange={(e) => setTransparent(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Transparent background only
+          </label>
           <Button
             className="h-9 px-5"
             variant="outline"
