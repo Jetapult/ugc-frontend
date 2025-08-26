@@ -405,46 +405,17 @@ const ScriptMenu: React.FC = () => {
                     setSelectedVoice({ voice_id: v.voice_id, name: v.name })
                   }
                 />
-                {selectedAvatar &&
-                  selectedVoice &&
-                  (videoStatus === "processing" ||
-                  (videoStatus === "completed" &&
-                    !videoAdded &&
-                    addPhase !== "done") ? (
-                    <div className="mt-3 flex w-full flex-col items-center gap-1">
-                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                      <p className="text-xs text-muted-foreground">
-                        {videoStatus === "processing"
-                          ? `Current Status: ${videoStatus}. this can take a few minutes`
-                          : addPhase === "downloading"
-                            ? "Downloading processed video…"
-                            : addPhase === "adding"
-                              ? "Adding video to timeline…"
-                              : "Finalizing…"}
-                      </p>
-                    </div>
-                  ) : videoStatus === "completed" && videoUrl && videoAdded ? (
-                    <Button asChild className="mt-3 w-full" variant="default">
-                      <a
-                        href={videoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
-                      >
-                        Download video
-                      </a>
-                    </Button>
-                  ) : (
-                    <Button
-                      className="mt-3 w-full"
-                      variant="default"
-                      disabled={
-                        creating || (videoStatus as any) === "processing" || !script
-                      }
-                      onClick={async () => {
+                <Button
+                  className="mt-3 w-full"
+                  variant="default"
+                  disabled={
+                    creating || ["processing", "pending"].includes(videoStatus) || !script || !selectedAvatar || !selectedVoice
+                  }
+                  onClick={async () => {
                         if (!selectedAvatar || !selectedVoice || !script)
                           return;
-                        setVideoStatus("processing");
+                        // Reset any previous error state
+                        setVideoStatus("pending");
                         setActiveTab("pending");
                         setVideoAdded(false);
                         setCreating(true);
@@ -482,7 +453,9 @@ const ScriptMenu: React.FC = () => {
                           setVideoStatus("processing");
                           setVideoUrl(null);
                         } catch (err: any) {
-                          alert(err.message ?? "Error");
+                          console.error("Video creation error:", err);
+                          alert(err.message ?? "Error creating video");
+                          setVideoStatus("error");
                         } finally {
                           setCreating(false);
                         }
@@ -490,46 +463,51 @@ const ScriptMenu: React.FC = () => {
                     >
                       {creating
                         ? "Creating…"
-                        : (videoStatus as any) === "processing"
-                          ? "Processing…"
-                          : "Create video"}
+                        : videoStatus === "error"
+                          ? "Retry video creation"
+                          : "Generate video"}
                     </Button>
-                  ))}
 
 
-                {videoStatus === "processing" ||
-                (videoStatus === "completed" &&
-                  !videoAdded &&
-                  addPhase !== "done") ? (
-                  <div className="mt-3 flex w-full flex-col items-center gap-1"></div>
-                ) : videoStatus === "completed" &&
-                  videoUrl &&
-                  !videoAdded &&
-                  addPhase === "done" ? (
-                  <div className="mt-3 flex w-full gap-2">
-                    <Button asChild variant="secondary" className="flex-1">
-                      <a
-                        href={videoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
-                      >
-                        Download
-                      </a>
-                    </Button>
-                    <Button
-                      className="flex-1"
-                      onClick={handleAddToTimeline}
-                      variant="default"
-                    >
-                      Add to timeline
-                    </Button>
-                  </div>
-                ) : videoStatus === "completed" && videoUrl && videoAdded ? (
-                  <div></div>
-                ) : (
-                  <></>
-                )}
+                    {/* Completed state - show download and add to timeline buttons */}
+                    {videoStatus === "completed" &&
+                      videoUrl &&
+                      !videoAdded &&
+                      addPhase === "done" && (
+                      <div className="mt-3 flex w-full gap-2">
+                        <Button asChild variant="secondary" className="flex-1">
+                          <a
+                            href={videoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                          >
+                            Download
+                          </a>
+                        </Button>
+                        <Button
+                          className="flex-1"
+                          onClick={handleAddToTimeline}
+                          variant="default"
+                        >
+                          Add to timeline
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Video already added - show download button */}
+                    {videoStatus === "completed" && videoUrl && videoAdded && (
+                      <Button asChild className="mt-3 w-full" variant="default">
+                        <a
+                          href={videoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                        >
+                          Download video
+                        </a>
+                      </Button>
+                    )}
               </>
             )}
           </div>
