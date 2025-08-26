@@ -27,7 +27,6 @@ interface Props {
   onSelect?: (avatar: AvatarItem) => void;
 }
 
-
 const pageLimit = 10;
 
 const AvatarPickerDialog: React.FC<Props> = ({
@@ -43,7 +42,7 @@ const AvatarPickerDialog: React.FC<Props> = ({
   const [search, setSearch] = useState("");
   const [gender, setGender] = useState<string | "">("");
   const [premium, setPremium] = useState<string | "">("false"); // Set to free by default
-  const [transparent, setTransparent] = useState<boolean>(true);
+  const [transparent, setTransparent] = useState<boolean>(true); // Always use transparent backgrounds
   const [loading, setLoading] = useState(false);
 
   const fetchAvatars = useCallback(async () => {
@@ -88,25 +87,11 @@ const AvatarPickerDialog: React.FC<Props> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[90vw] max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="flex max-h-[90vh] w-[90vw] max-w-4xl flex-col">
         <DialogHeader>
           <DialogTitle>Select Avatar</DialogTitle>
           <DialogDescription>
             Choose an avatar for your video.
-            <div className="mt-2 rounded-md bg-yellow-50 border border-yellow-200 p-3">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Important:</strong> Only choose avatars with transparent backgrounds. Avatars with solid backgrounds will cause generation to fail.
-                  </p>
-                </div>
-              </div>
-            </div>
           </DialogDescription>
         </DialogHeader>
         <div className="mb-6 flex flex-wrap items-end gap-3 p-2">
@@ -135,7 +120,8 @@ const AvatarPickerDialog: React.FC<Props> = ({
             <option value="true">Premium</option>
             <option value="false">Free</option>
           </select> */}
-          <label className="flex items-center gap-2 text-sm h-9">
+          {/* Transparent background filter hidden - always enabled */}
+          {/* <label className="flex items-center gap-2 text-sm h-9">
             <input
               type="checkbox"
               checked={transparent}
@@ -143,7 +129,7 @@ const AvatarPickerDialog: React.FC<Props> = ({
               className="h-4 w-4"
             />
             Transparent background only
-          </label>
+          </label> */}
           <Button
             className="h-9 px-5"
             variant="outline"
@@ -155,7 +141,7 @@ const AvatarPickerDialog: React.FC<Props> = ({
             Apply
           </Button>
         </div>
-        <div className="grid max-h-[40vh] grid-cols-5 gap-4 overflow-auto p-2 flex-1">
+        <div className="grid max-h-[40vh] flex-1 grid-cols-5 gap-4 overflow-auto p-2">
           {loading && <p className="col-span-5 text-center">Loading…</p>}
           {!loading &&
             items.map((av) => (
