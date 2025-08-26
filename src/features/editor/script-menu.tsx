@@ -283,7 +283,7 @@ const ScriptMenu: React.FC = () => {
                         query_text: '',
                         context: context || '',
                         media_file: '',
-                        media_url: uploadedUrl,
+                        media_url: encodeURI(uploadedUrl),
                         creative_gallery_id: ''
                       });
                       
