@@ -42,7 +42,7 @@ const AvatarPickerDialog: React.FC<Props> = ({
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [gender, setGender] = useState<string | "">("");
-  const [premium, setPremium] = useState<string | "">("");
+  const [premium, setPremium] = useState<string | "">("false"); // Set to free by default
   const [transparent, setTransparent] = useState<boolean>(true);
   const [loading, setLoading] = useState(false);
 
@@ -125,7 +125,8 @@ const AvatarPickerDialog: React.FC<Props> = ({
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
-          <select
+          {/* Premium filter hidden - defaulting to free avatars only */}
+          {/* <select
             value={premium}
             onChange={(e) => setPremium(e.target.value)}
             className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
@@ -133,7 +134,7 @@ const AvatarPickerDialog: React.FC<Props> = ({
             <option value="">Any plan</option>
             <option value="true">Premium</option>
             <option value="false">Free</option>
-          </select>
+          </select> */}
           <label className="flex items-center gap-2 text-sm h-9">
             <input
               type="checkbox"
