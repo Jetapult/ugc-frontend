@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { api, ProjectAsset } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Plus, FileText, Info } from "lucide-react";
 
 interface AssetPickerProps {
   projectId: string;
   onSelect: (asset: ProjectAsset) => void;
   selectedAssetId?: string;
   onBack?: () => void;
+  onAddToTimeline?: (asset: ProjectAsset) => void;
+  onGenerateScript?: (asset: ProjectAsset) => void;
 }
 
 const AssetPicker: React.FC<AssetPickerProps> = ({
@@ -15,6 +19,8 @@ const AssetPicker: React.FC<AssetPickerProps> = ({
   onSelect,
   selectedAssetId,
   onBack,
+  onAddToTimeline,
+  onGenerateScript,
 }) => {
   const [assets, setAssets] = useState<ProjectAsset[]>([]);
   const [loading, setLoading] = useState(false);
@@ -205,8 +211,8 @@ const AssetPicker: React.FC<AssetPickerProps> = ({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full space-y-3">
+      <div className="flex items-center justify-between flex-shrink-0">
         <h4 className="text-sm font-medium text-foreground">
           Existing assets:
         </h4>
@@ -224,12 +230,12 @@ const AssetPicker: React.FC<AssetPickerProps> = ({
           ))}
         </select>
       </div>
-      <div className="space-y-3">
-        <div className="-m-1 grid max-h-64 grid-cols-2 gap-3 overflow-y-auto p-1">
+      <div className="flex-1 flex flex-col">
+        <div className="grid grid-cols-2 gap-3 overflow-y-auto p-2 flex-1">
           {videoAssets.map((asset) => (
             <div
               key={asset.id}
-              className={`relative cursor-pointer rounded-md border transition-all hover:ring-2 hover:ring-primary ${
+              className={`group relative cursor-pointer rounded-md border transition-all hover:ring-2 hover:ring-primary ${
                 selectedAssetId === asset.id
                   ? "bg-primary/5 ring-2 ring-primary"
                   : "bg-muted"
@@ -249,6 +255,143 @@ const AssetPicker: React.FC<AssetPickerProps> = ({
                   </span>
                 </div>
               )}
+
+              {/* Hover overlay with action buttons */}
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-md bg-black/70 opacity-0 transition-all duration-200 group-hover:opacity-100">
+                {onAddToTimeline && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="h-6 px-2 text-xs shadow-lg whitespace-nowrap"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddToTimeline(asset);
+                    }}
+                  >
+                    <Plus className="mr-1 h-3 w-3" />
+                    Timeline
+                  </Button>
+                )}
+                {onGenerateScript && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="h-6 px-2 text-xs shadow-lg whitespace-nowrap"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onGenerateScript(asset);
+                    }}
+                  >
+                    <FileText className="mr-1 h-3 w-3" />
+                    Script
+                  </Button>
+                )}
+                {/* Info button - always show */}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-6 px-2 text-xs shadow-lg whitespace-nowrap"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                    >
+                      <Info className="mr-1 h-3 w-3" />
+                      Info
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Asset Details</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <strong>Name:</strong>
+                        <p className="text-sm text-muted-foreground mt-1">{asset.name}</p>
+                      </div>
+                      <div>
+                        <strong>ID:</strong>
+                        <p className="text-xs text-muted-foreground mt-1 font-mono">{asset.id}</p>
+                      </div>
+                      <div>
+                        <strong>Type:</strong>
+                        <Badge className="ml-2" variant="secondary">
+                          {getAssetTypeLabel(asset.type)}
+                        </Badge>
+                      </div>
+                      <div>
+                        <strong>Created:</strong>
+                        <span className="ml-2 text-sm">{new Date(asset.created_at).toLocaleDateString('en-GB')} {new Date(asset.created_at).toLocaleTimeString('en-GB', { hour12: true })}</span>
+                      </div>
+                      {asset.updated_at && (
+                        <div>
+                          <strong>Updated:</strong>
+                          <span className="ml-2 text-sm">{new Date(asset.updated_at).toLocaleDateString('en-GB')} {new Date(asset.updated_at).toLocaleTimeString('en-GB', { hour12: true })}</span>
+                        </div>
+                      )}
+                      {asset.url && (
+                        <div>
+                          <strong>Video URL:</strong>
+                          <p className="text-xs text-muted-foreground mt-1 break-all bg-muted p-2 rounded">{asset.url}</p>
+                        </div>
+                      )}
+                      {asset.thumbnail_url && (
+                        <div>
+                          <strong>Thumbnail URL:</strong>
+                          <p className="text-xs text-muted-foreground mt-1 break-all bg-muted p-2 rounded">{asset.thumbnail_url}</p>
+                        </div>
+                      )}
+                      {/* Show all additional properties from the asset object */}
+                      {Object.entries(asset).map(([key, value]) => {
+                        // Skip already displayed fields
+                        if (['id', 'name', 'type', 'created_at', 'updated_at', 'url', 'thumbnail_url'].includes(key)) {
+                          return null;
+                        }
+                        
+                        // Skip null/undefined values
+                        if (value === null || value === undefined) {
+                          return null;
+                        }
+                        
+                        return (
+                          <div key={key}>
+                            <strong>{key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}:</strong>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {typeof value === 'object' ? (
+                                <pre className="bg-muted p-2 rounded text-xs overflow-x-auto max-w-full">
+                                  {JSON.stringify(value, null, 2)}
+                                </pre>
+                              ) : typeof value === 'string' && value.length > 100 ? (
+                                <div className="bg-muted p-2 rounded text-xs max-h-32 overflow-y-auto break-words">
+                                  {value}
+                                </div>
+                              ) : (
+                                <span className={typeof value === 'string' && value.length > 50 ? 'break-words' : ''}>
+                                  {String(value)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {asset.thumbnail_url && (
+                        <div>
+                          <strong>Preview:</strong>
+                          <div className="mt-2">
+                            <img 
+                              src={asset.thumbnail_url} 
+                              alt={asset.name}
+                              className="w-32 h-20 object-cover rounded-md border"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
               <div className="p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex-1 truncate text-xs font-medium text-foreground">

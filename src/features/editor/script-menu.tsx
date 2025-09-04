@@ -49,6 +49,9 @@ const ScriptMenu: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [scriptError, setScriptError] = useState<string | null>(null);
+  const [scriptWarning, setScriptWarning] = useState<string | null>(null);
+  const [addingToTimeline, setAddingToTimeline] = useState(false);
+  const [timelineProgress, setTimelineProgress] = useState(0);
   // possible values:
   // - idle: initial state or reset
   // - pending: request has been sent but remote processing hasn’t started
@@ -278,15 +281,33 @@ const ScriptMenu: React.FC = () => {
   };
 
   return (
-    <div className="flex w-full flex-col gap-3 overflow-auto p-4 text-sm">
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+    <div className="flex h-full w-full flex-col gap-3 overflow-hidden p-4 text-sm">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex h-full w-full flex-col">
+        <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
           <TabsTrigger value="generate">Generate Video</TabsTrigger>
           <TabsTrigger value="pending">Pending Videos</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="generate" className="mt-4">
-          <div className="flex w-full flex-col gap-3">
+        <TabsContent value="generate" className="mt-4 flex-1 overflow-auto">
+          {/* Timeline loading overlay */}
+          {addingToTimeline && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-3 rounded-lg bg-card p-6 shadow-lg">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <div className="text-center">
+                  <p className="text-sm font-medium">Adding video to timeline...</p>
+                  <p className="text-xs text-muted-foreground">Downloading video</p>
+                </div>
+                <div className="w-48">
+                  <Progress value={timelineProgress} className="h-2" />
+                  <p className="text-xs text-center text-muted-foreground mt-1">
+                    {timelineProgress}%
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className={`flex w-full flex-col gap-3 ${addingToTimeline ? 'pointer-events-none opacity-50' : ''}`}>
             <Button
               className="flex gap-1 border border-border"
               variant="outline"
@@ -332,6 +353,73 @@ const ScriptMenu: React.FC = () => {
                   setSelectedAvatar(null);
                   setWidth(1080);
                   setHeight(1920);
+                }}
+                onAddToTimeline={async (asset) => {
+                  if (addingToTimeline) return;
+                  
+                  try {
+                    setAddingToTimeline(true);
+                    setTimelineProgress(0);
+
+                    const response = await fetch(asset.url);
+                    if (!response.ok) {
+                      throw new Error(`Failed to download: ${response.status}`);
+                    }
+
+                    const total = Number(response.headers.get("content-length"));
+                    if (response.body && total) {
+                      const reader = response.body.getReader();
+                      let received = 0;
+                      const chunks: Uint8Array[] = [];
+
+                      while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        if (value) {
+                          chunks.push(value);
+                          received += value.length;
+                          setTimelineProgress(Math.round((received / total) * 100));
+                        }
+                      }
+
+                      const videoBlob = new Blob(chunks, { type: "video/mp4" });
+                      const blobUrl = URL.createObjectURL(videoBlob);
+
+                      dispatch(ADD_VIDEO, {
+                        payload: {
+                          id: generateId(),
+                          details: { src: asset.url },
+                          metadata: { previewUrl: blobUrl },
+                        },
+                        options: { resourceId: "main", scaleMode: "fit" },
+                      });
+                    } else {
+                      // Fallback for when content-length is not available
+                      const videoBlob = await response.blob();
+                      const blobUrl = URL.createObjectURL(videoBlob);
+
+                      dispatch(ADD_VIDEO, {
+                        payload: {
+                          id: generateId(),
+                          details: { src: asset.url },
+                          metadata: { previewUrl: blobUrl },
+                        },
+                        options: { resourceId: "main", scaleMode: "fit" },
+                      });
+                    }
+                  } catch (err) {
+                    console.error("Failed to add video to timeline:", err);
+                    alert("Failed to add video to timeline: " + (err as Error).message);
+                  } finally {
+                    setAddingToTimeline(false);
+                    setTimelineProgress(0);
+                  }
+                }}
+                onGenerateScript={(asset) => {
+                  // Set selected asset and trigger script generation
+                  setSelectedAsset(asset);
+                  setUploadedUrl(asset.url);
+                  setVideoUploaded(true);
                 }}
               />
             )}
@@ -380,7 +468,9 @@ const ScriptMenu: React.FC = () => {
                       const scriptText = String(text);
                       
                       if (scriptText.length > 500) {
-                        setScriptError(`Generated script is ${scriptText.length} characters (limit: 500). Please use a shorter video to avoid generation failures.`);
+                        setScriptWarning(`Generated script is ${scriptText.length} characters (limit: 500). Please use a shorter video to avoid generation failures.`);
+                      } else {
+                        setScriptWarning(null);
                       }
                       
                       setScript(scriptText);
@@ -399,6 +489,12 @@ const ScriptMenu: React.FC = () => {
                 {scriptError && (
                   <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
                     {scriptError}
+                  </div>
+                )}
+                
+                {scriptWarning && (
+                  <div className="p-3 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md">
+                    ⚠️ {scriptWarning}
                   </div>
                 )}
               </div>
@@ -440,7 +536,25 @@ const ScriptMenu: React.FC = () => {
                     {selectedVoice ? "Change voice" : "Select voice"}
                   </Button>
                 </div>
-                <div className="mt-1 flex flex-col gap-2">
+
+                {selectedVoice && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Selected voice:{" "}
+                    <span className="font-medium text-foreground">
+                      {selectedVoice.name}
+                    </span>
+                  </p>
+                )}
+                {selectedAvatar && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Selected avatar:{" "}
+                    <span className="font-medium text-foreground">
+                      {selectedAvatar.avatar_name}
+                    </span>
+                  </p>
+                )}
+
+                <div className="mt-3 flex flex-col gap-2">
                   <p className="text-xs text-muted-foreground">Resolution</p>
                   <div className="flex w-full items-center gap-2">
                     <Input
@@ -460,23 +574,6 @@ const ScriptMenu: React.FC = () => {
                     />
                   </div>
                 </div>
-
-                {selectedVoice && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Selected voice:{" "}
-                    <span className="font-medium text-foreground">
-                      {selectedVoice.name}
-                    </span>
-                  </p>
-                )}
-                {selectedAvatar && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Selected avatar:{" "}
-                    <span className="font-medium text-foreground">
-                      {selectedAvatar.avatar_name}
-                    </span>
-                  </p>
-                )}
                 <AvatarPickerDialog
                   open={avatarDialogOpen}
                   onOpenChange={setAvatarDialogOpen}
@@ -597,7 +694,7 @@ const ScriptMenu: React.FC = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="pending" className="mt-4">
+        <TabsContent value="pending" className="mt-4 flex-1 overflow-auto">
           <PendingHeyGenExports projectId={projectId} />
         </TabsContent>
       </Tabs>
