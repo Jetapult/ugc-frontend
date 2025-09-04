@@ -11,6 +11,8 @@ import AvatarPickerDialog from "@/components/heygen/avatar-picker-dialog";
 import { ADD_VIDEO } from "@designcombo/state";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import AssetPicker from "@/components/project/asset-picker";
+import type { ProjectAsset, HeyGenExportDetails } from "@/lib/api";
 
 // Add interface to support video cache on window object
 declare global {
@@ -29,6 +31,8 @@ const ScriptMenu: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [videoUploaded, setVideoUploaded] = useState(false);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<ProjectAsset | null>(null);
+  const [loadingAssetDetails, setLoadingAssetDetails] = useState(false);
   const [context, setContext] = useState("");
   const [generating, setGenerating] = useState(false);
   const [script, setScript] = useState<string | null>(null);
@@ -72,6 +76,56 @@ const ScriptMenu: React.FC = () => {
 
   const handleUploadClick = () => fileInputRef.current?.click();
 
+  const handleAssetSelect = async (asset: ProjectAsset) => {
+    setSelectedAsset(asset);
+    setUploadedUrl(asset.url);
+    setVideoUploaded(true);
+    
+    // If it's a HeyGen export, fetch details and populate data
+    if (asset.type === "heygen_export") {
+      setLoadingAssetDetails(true);
+      try {
+        const response = await api.heygenExports.getDetails(asset.id);
+        const details = response.data;
+        
+        // Populate script if available
+        if (details.script) {
+          setScript(details.script);
+        }
+        
+        // Populate voice if available
+        if (details.voice_id && details.voice_name) {
+          setSelectedVoice({
+            voice_id: details.voice_id,
+            name: details.voice_name,
+          });
+        }
+        
+        // Populate avatar if available
+        if (details.avatar_id && details.avatar_name) {
+          setSelectedAvatar({
+            avatar_id: details.avatar_id,
+            avatar_name: details.avatar_name,
+          });
+        }
+        
+        // Set dimensions if available
+        if (details.dimensions) {
+          setWidth(details.dimensions.width);
+          setHeight(details.dimensions.height);
+        }
+        
+      } catch (err) {
+        console.error("Failed to fetch HeyGen export details:", err);
+      } finally {
+        setLoadingAssetDetails(false);
+      }
+    } else {
+      // Clear any previous script when selecting a non-HeyGen asset
+      setScript(null);
+    }
+  };
+
   const handleFilesSelected = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -101,6 +155,8 @@ const ScriptMenu: React.FC = () => {
       clearInterval(progressInterval);
       setUploadProgress(100);
       setUploadedUrl(publicUrl);
+    // Clear selected asset when uploading new file
+    setSelectedAsset(null);
     } catch (err) {
       console.error("Upload failed", err);
       URL.revokeObjectURL(objectUrl);
@@ -259,6 +315,34 @@ const ScriptMenu: React.FC = () => {
               className="hidden"
               onChange={handleFilesSelected}
             />
+
+            {/* Asset Picker */}
+            {projectId && (
+              <AssetPicker
+                projectId={projectId}
+                onSelect={handleAssetSelect}
+                selectedAssetId={selectedAsset?.id}
+                onBack={() => {
+                  setSelectedAsset(null);
+                  setUploadedUrl(null);
+                  setVideoUploaded(false);
+                  // Clear script and other populated data when deselecting asset
+                  setScript(null);
+                  setSelectedVoice(null);
+                  setSelectedAvatar(null);
+                  setWidth(1080);
+                  setHeight(1920);
+                }}
+              />
+            )}
+
+            {/* Loading indicator for asset details */}
+            {loadingAssetDetails && (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="ml-2 text-sm text-muted-foreground">Loading asset details...</span>
+              </div>
+            )}
 
             {videoUploaded && (
               <div className="flex flex-col gap-2">
