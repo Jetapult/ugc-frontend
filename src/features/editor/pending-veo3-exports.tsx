@@ -218,7 +218,7 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
                           <div className="flex-1">
                             <CardTitle className="text-sm">Veo3 Video</CardTitle>
                             <CardDescription className="text-xs mt-1">
-                              {new Date(exp.created_at).toLocaleString()}
+                              {new Date(exp.created_at).toLocaleDateString('en-GB')} {new Date(exp.created_at).toLocaleTimeString('en-GB', { hour12: true })}
                             </CardDescription>
                           </div>
                           <Badge variant={statusVariantMap[exp.status.toLowerCase()]}>
@@ -228,8 +228,9 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
                       </CardHeader>
                       <CardContent className="pt-0">
                         <div className="space-y-3">
-                          <div className="text-xs text-muted-foreground">
-                            <strong>Prompt:</strong> {exp.prompt}
+                          <div className="text-xs text-muted-foreground flex items-start gap-1">
+                            <strong className="flex-shrink-0">Prompt:</strong> 
+                            <span className="truncate flex-1 min-h-[1.2em]">{exp.prompt}</span>
                           </div>
 
                           {exp.message && (
@@ -258,11 +259,11 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
                       </div>
                       <div>
                         <strong>Created:</strong>
-                        <span className="ml-2 text-sm">{new Date(exp.created_at).toLocaleString()}</span>
+                        <span className="ml-2 text-sm">{new Date(exp.created_at).toLocaleDateString('en-GB')} {new Date(exp.created_at).toLocaleTimeString('en-GB', { hour12: true })}</span>
                       </div>
                       <div>
                         <strong>Updated:</strong>
-                        <span className="ml-2 text-sm">{new Date(exp.updated_at).toLocaleString()}</span>
+                        <span className="ml-2 text-sm">{new Date(exp.updated_at).toLocaleDateString('en-GB')} {new Date(exp.updated_at).toLocaleTimeString('en-GB', { hour12: true })}</span>
                       </div>
                       <div>
                         <strong>Aspect Ratio:</strong>
