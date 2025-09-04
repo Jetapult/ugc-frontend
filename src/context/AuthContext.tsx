@@ -1,6 +1,15 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { getAuthToken as getStoredToken, setAuthToken as storeToken, removeAuthToken as clearToken } from "@/lib/token";
+import {
+  getAuthToken as getStoredToken,
+  setAuthToken as storeToken,
+  removeAuthToken as clearToken,
+} from "@/lib/token";
+import {
+  setUnauthorizedHandler,
+  clearUnauthorizedHandler,
+} from "@/lib/unauthorized-handler";
+import { UnauthorizedDialog } from "@/components/auth/unauthorized-dialog";
 
 interface AuthContextValue {
   token: string | null;
@@ -11,16 +20,17 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-
-
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [token, setToken] = useState<string | null>(() => getStoredToken());
+  const [showUnauthorizedDialog, setShowUnauthorizedDialog] = useState(false);
 
   const login = async (email: string, password: string) => {
     const data: any = await api.auth.login(email, password);
     // Support both { access_token } and { data: { token } } response shapes
-    const tokenResp: string | undefined = data?.access_token ?? data?.token ?? data?.data?.token;
+    const tokenResp: string | undefined =
+      data?.access_token ?? data?.token ?? data?.data?.token;
     if (!tokenResp) {
       throw new Error("Login response did not contain a token");
     }
@@ -31,12 +41,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     clearToken();
     setToken(null);
+    setShowUnauthorizedDialog(false);
   };
 
   const setTokenDirect = (newToken: string) => {
     storeToken(newToken);
     setToken(newToken);
   };
+
+  // Set up unauthorized handler
+  useEffect(() => {
+    const handleUnauthorizedAccess = () => {
+      setShowUnauthorizedDialog(true);
+    };
+
+    setUnauthorizedHandler(handleUnauthorizedAccess);
+
+    return () => {
+      clearUnauthorizedHandler();
+    };
+  }, []);
 
   // keep token in sync if changed in another tab
   useEffect(() => {
@@ -47,9 +71,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener("storage", handler);
   }, []);
 
+  const handleRedirectToLogin = () => {
+    logout();
+    // Redirect to login page - adjust this path based on your routing
+    window.location.href = "/";
+  };
+
   return (
-    <AuthContext.Provider value={{ token, login, logout, setToken: setTokenDirect }}>
+    <AuthContext.Provider
+      value={{ token, login, logout, setToken: setTokenDirect }}
+    >
       {children}
+      <UnauthorizedDialog
+        open={showUnauthorizedDialog}
+        onOpenChange={setShowUnauthorizedDialog}
+        onRedirect={handleRedirectToLogin}
+      />
     </AuthContext.Provider>
   );
 };
