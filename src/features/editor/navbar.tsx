@@ -108,7 +108,7 @@ export default function Navbar({
       let publicUrl: string;
       try {
         const { uploadFile } = await import("@/utils/upload");
-        publicUrl = await uploadFile(file);
+        publicUrl = await uploadFile(file, projectId || "default");
       } catch (err) {
         console.error("Failed to upload file", err);
         URL.revokeObjectURL(objectUrl);

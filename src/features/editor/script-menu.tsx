@@ -182,7 +182,7 @@ const ScriptMenu: React.FC = () => {
         });
       }, 200);
 
-      publicUrl = await uploadFile(file);
+      publicUrl = await uploadFile(file, projectId!);
       
       clearInterval(progressInterval);
       setUploadProgress(100);

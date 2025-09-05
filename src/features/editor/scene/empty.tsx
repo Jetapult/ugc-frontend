@@ -1,9 +1,10 @@
 import useStore from "../store/use-store";
 import { dispatch } from "@designcombo/events";
-import { ADD_VIDEO } from "@designcombo/state";
+import { ADD_IMAGE, ADD_VIDEO } from "@designcombo/state";
 import { generateId } from "@designcombo/timeline";
-import { IVideo } from "@designcombo/types";
-import { useEffect, useRef, useState } from "react";
+import { IImage, IVideo } from "@designcombo/types";
+import React, { useEffect, useRef, useState } from "react";
+import { useDownloadState } from "../store/use-download-state";
 import { Droppable } from "@/components/ui/droppable";
 import { PlusIcon } from "lucide-react";
 import { DroppableArea } from "./droppable";
@@ -14,6 +15,7 @@ const SceneEmpty = () => {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [desiredSize, setDesiredSize] = useState({ width: 0, height: 0 });
   const { size } = useStore();
+  const { projectId } = useDownloadState();
 
   useEffect(() => {
     const container = containerRef.current!;
@@ -45,7 +47,7 @@ const SceneEmpty = () => {
       let publicUrl: string;
       try {
         const { uploadFile } = await import("../../../utils/upload");
-        publicUrl = await uploadFile(file);
+        publicUrl = await uploadFile(file, projectId || "default");
       } catch (err) {
         console.error("Failed to upload file", err);
         // Optionally notify the user here (toast/snackbar)
