@@ -279,11 +279,16 @@ const AssetPicker: React.FC<AssetPickerProps> = ({
                     className="h-6 px-2 text-xs shadow-lg whitespace-nowrap"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onGenerateScript(asset);
+                      // For HeyGen videos, we want to populate the fields automatically
+                      if (asset.type === "heygen_export") {
+                        onSelect(asset); // This will trigger the field population in script-menu
+                      } else {
+                        onGenerateScript(asset);
+                      }
                     }}
                   >
                     <FileText className="mr-1 h-3 w-3" />
-                    Script
+                    {asset.type === "heygen_export" ? "Use Script" : "Script"}
                   </Button>
                 )}
                 {/* Info button - always show */}
