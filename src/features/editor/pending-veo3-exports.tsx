@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Download, ExternalLink, RefreshCw, Plus, Loader2 } from "lucide-react";
 import { api, type Veo3Export } from "@/lib/api";
@@ -218,7 +218,7 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
                           <div className="flex-1">
                             <CardTitle className="text-sm">Veo3 Video</CardTitle>
                             <CardDescription className="text-xs mt-1">
-                              {new Date(exp.created_at).toLocaleString()}
+                              {new Date(exp.created_at).toLocaleDateString('en-GB')} {new Date(exp.created_at).toLocaleTimeString('en-GB', { hour12: true })}
                             </CardDescription>
                           </div>
                           <Badge variant={statusVariantMap[exp.status.toLowerCase()]}>
@@ -228,8 +228,9 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
                       </CardHeader>
                       <CardContent className="pt-0">
                         <div className="space-y-3">
-                          <div className="text-xs text-muted-foreground">
-                            <strong>Prompt:</strong> {exp.prompt}
+                          <div className="text-xs text-muted-foreground flex items-start gap-1">
+                            <strong className="flex-shrink-0">Prompt:</strong> 
+                            <span className="truncate flex-1 min-h-[1.2em]">{exp.prompt}</span>
                           </div>
 
                           {exp.message && (
@@ -241,9 +242,39 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
                       </CardContent>
                     </Card>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent 
+                    className={`max-w-2xl ${loadState.phase !== "idle" ? "[&>button]:hidden" : ""}`}
+                    onInteractOutside={(e) => {
+                      // Prevent closing dialog during download/add operations
+                      const loadState = loadStates[exp.id] || { phase: "idle", progress: 0 };
+                      if (loadState.phase !== "idle") {
+                        e.preventDefault();
+                      }
+                    }} 
+                    onEscapeKeyDown={(e) => {
+                      // Prevent closing dialog during download/add operations
+                      const loadState = loadStates[exp.id] || { phase: "idle", progress: 0 };
+                      if (loadState.phase !== "idle") {
+                        e.preventDefault();
+                      }
+                    }}
+                    onPointerDownOutside={(e) => {
+                      // Prevent closing dialog during download/add operations
+                      const loadState = loadStates[exp.id] || { phase: "idle", progress: 0 };
+                      if (loadState.phase !== "idle") {
+                        e.preventDefault();
+                      }
+                    }}
+                  >
                     <DialogHeader>
                       <DialogTitle>Veo3 Video Export Details</DialogTitle>
+                      {loadState.phase !== "idle" && (
+                        <DialogDescription className="text-sm text-muted-foreground">
+                          {loadState.phase === "downloading" ? "Downloading video... Please wait." : 
+                           loadState.phase === "adding" ? "Adding to timeline... Please wait." : 
+                           "Processing... Please wait."}
+                        </DialogDescription>
+                      )}
                     </DialogHeader>
                     <div className="space-y-4">
                       <div>
@@ -258,11 +289,11 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
                       </div>
                       <div>
                         <strong>Created:</strong>
-                        <span className="ml-2 text-sm">{new Date(exp.created_at).toLocaleString()}</span>
+                        <span className="ml-2 text-sm">{new Date(exp.created_at).toLocaleDateString('en-GB')} {new Date(exp.created_at).toLocaleTimeString('en-GB', { hour12: true })}</span>
                       </div>
                       <div>
                         <strong>Updated:</strong>
-                        <span className="ml-2 text-sm">{new Date(exp.updated_at).toLocaleString()}</span>
+                        <span className="ml-2 text-sm">{new Date(exp.updated_at).toLocaleDateString('en-GB')} {new Date(exp.updated_at).toLocaleTimeString('en-GB', { hour12: true })}</span>
                       </div>
                       <div>
                         <strong>Aspect Ratio:</strong>
@@ -288,7 +319,7 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
                           <p className="text-sm text-red-700 mt-1">{(exp as any).error_message}</p>
                         </div>
                       )}
-                      {exp.status.toLowerCase() === "processing" && (
+                      {(exp.status.toLowerCase() === "processing" || exp.status.toLowerCase() === "failed") && (
                         <div className="flex justify-end">
                           <Button
                             variant="outline"
@@ -320,9 +351,26 @@ const PendingVeo3Exports: React.FC<PendingVeo3ExportsProps> = ({ projectId }) =>
                                 Download Video
                               </a>
                             </Button>
-                            <Button onClick={() => handleLoadToTimeline(exp)}>
-                              <Plus className="mr-2 h-4 w-4" />
-                              Load to Timeline
+                            <Button 
+                              onClick={() => handleLoadToTimeline(exp)}
+                              disabled={loadState.phase !== "idle"}
+                            >
+                              {loadState.phase === "downloading" ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Downloading... {loadState.progress}%
+                                </>
+                              ) : loadState.phase === "adding" ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Adding to Timeline...
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Load to Timeline
+                                </>
+                              )}
                             </Button>
                           </div>
                         </div>

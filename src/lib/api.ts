@@ -7,6 +7,7 @@
 import { API_BASE_URL, API_ENDPOINTS } from "./config";
 import { getAuthToken } from "./token";
 import { IDesign } from "@designcombo/types";
+import { handleUnauthorized } from "./unauthorized-handler";
 
 export interface ApiRequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -94,6 +95,11 @@ export async function apiRequest<T = unknown>(
     }
 
     if (!res.ok) {
+      // Handle 401 Unauthorized globally
+      if (res.status === 401 && auth) {
+        handleUnauthorized();
+      }
+      
       const errorData = data as {
         detail?: string;
         error?: string;
@@ -136,6 +142,19 @@ export interface Project {
   user_id: number;
   created_at: string;
   updated_at: string;
+}
+
+// Project Asset Types
+export interface ProjectAsset {
+  id: string;
+  type: "upload" | "heygen_export" | "veo3_export";
+  name: string;
+  url: string;
+  thumbnail_url?: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  created_at: string;
+  updated_at: string;
+  metadata: Record<string, unknown>;
 }
 
 export interface ProjectListItem {
@@ -212,6 +231,12 @@ export interface HeyGenExport {
   heygen_video_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface HeyGenExportDetails extends HeyGenExport {
+  avatar_name?: string;
+  voice_name?: string;
+  script?: string;
 }
 
 export interface CreateHeyGenExportRequest extends Record<string, unknown> {
@@ -333,6 +358,27 @@ export const api = {
           auth: true,
         },
       ),
+
+    // Get project assets
+    assets: (id: string, params?: { 
+      asset_type?: "all" | "uploads" | "heygen_exports" | "veo3_exports";
+      limit?: number;
+      offset?: number;
+    }) => {
+      const search = params
+        ? new URLSearchParams(
+            Object.entries(params).map(([k, v]) => [k, String(v)]),
+          ).toString()
+        : "";
+      return apiRequest<{ 
+        success: boolean; 
+        data: ProjectAsset[];
+        pagination?: { limit: number; offset: number; total: number };
+      }>(
+        `${API_ENDPOINTS.project(id)}/assets${search ? `?${search}` : ""}`,
+        { auth: true },
+      );
+    },
   },
 
   // UGC Export Management
@@ -444,6 +490,14 @@ export const api = {
     get: (id: string) =>
       apiRequest<{ success: boolean; data: HeyGenExport }>(
         API_ENDPOINTS.heygenExport(id),
+        {
+          auth: true,
+        },
+      ),
+
+    getDetails: (id: string) =>
+      apiRequest<{ success: boolean; data: HeyGenExportDetails }>(
+        `${API_ENDPOINTS.heygenExport(id)}/details`,
         {
           auth: true,
         },

@@ -11,6 +11,8 @@ import AvatarPickerDialog from "@/components/heygen/avatar-picker-dialog";
 import { ADD_VIDEO } from "@designcombo/state";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import AssetPicker from "@/components/project/asset-picker";
+import type { ProjectAsset, HeyGenExportDetails } from "@/lib/api";
 
 // Add interface to support video cache on window object
 declare global {
@@ -29,6 +31,8 @@ const ScriptMenu: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [videoUploaded, setVideoUploaded] = useState(false);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<ProjectAsset | null>(null);
+  const [loadingAssetDetails, setLoadingAssetDetails] = useState(false);
   const [context, setContext] = useState("");
   const [generating, setGenerating] = useState(false);
   const [script, setScript] = useState<string | null>(null);
@@ -45,6 +49,9 @@ const ScriptMenu: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [scriptError, setScriptError] = useState<string | null>(null);
+  const [scriptWarning, setScriptWarning] = useState<string | null>(null);
+  const [addingToTimeline, setAddingToTimeline] = useState(false);
+  const [timelineProgress, setTimelineProgress] = useState(0);
   // possible values:
   // - idle: initial state or reset
   // - pending: request has been sent but remote processing hasn’t started
@@ -71,6 +78,85 @@ const ScriptMenu: React.FC = () => {
   >("idle");
 
   const handleUploadClick = () => fileInputRef.current?.click();
+
+  const handleAssetSelect = async (asset: ProjectAsset) => {
+    setSelectedAsset(asset);
+    setUploadedUrl(asset.url);
+    setVideoUploaded(true);
+    
+    // If it's a HeyGen export, try to populate data from metadata first, then API
+    if (asset.type === "heygen_export") {
+      setLoadingAssetDetails(true);
+      
+      // First, check if data is available in asset metadata
+      const metadata = asset.metadata as any;
+      console.log("HeyGen asset metadata:", metadata);
+      
+      // Try to populate from metadata first
+      if (metadata?.script) {
+        setScript(metadata.script);
+      }
+      if (metadata?.voice_id && metadata?.voice_name) {
+        setSelectedVoice({
+          voice_id: metadata.voice_id,
+          name: metadata.voice_name,
+        });
+      }
+      if (metadata?.avatar_id && metadata?.avatar_name) {
+        setSelectedAvatar({
+          avatar_id: metadata.avatar_id,
+          avatar_name: metadata.avatar_name,
+        });
+      }
+      if (metadata?.dimensions || (metadata?.width && metadata?.height)) {
+        setWidth(metadata.dimensions?.width || metadata.width || 1280);
+        setHeight(metadata.dimensions?.height || metadata.height || 720);
+      }
+      
+      // If no metadata found, try the API call as fallback
+      if (!metadata?.script) {
+        try {
+          const response = await api.heygenExports.getDetails(asset.id);
+          const details = response.data;
+          
+          // Populate script if available
+          if (details.script) {
+            setScript(details.script);
+          }
+          
+          // Populate voice if available
+          if (details.voice_id && details.voice_name) {
+            setSelectedVoice({
+              voice_id: details.voice_id,
+              name: details.voice_name,
+            });
+          }
+          
+          // Populate avatar if available
+          if (details.avatar_id && details.avatar_name) {
+            setSelectedAvatar({
+              avatar_id: details.avatar_id,
+              avatar_name: details.avatar_name,
+            });
+          }
+          
+          // Set dimensions if available
+          if (details.dimensions) {
+            setWidth(details.dimensions.width);
+            setHeight(details.dimensions.height);
+          }
+          
+        } catch (err) {
+          console.error("Failed to fetch HeyGen export details:", err);
+        }
+      }
+      
+      setLoadingAssetDetails(false);
+    } else {
+      // Clear any previous script when selecting a non-HeyGen asset
+      setScript(null);
+    }
+  };
 
   const handleFilesSelected = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -101,6 +187,8 @@ const ScriptMenu: React.FC = () => {
       clearInterval(progressInterval);
       setUploadProgress(100);
       setUploadedUrl(publicUrl);
+    // Clear selected asset when uploading new file
+    setSelectedAsset(null);
     } catch (err) {
       console.error("Upload failed", err);
       URL.revokeObjectURL(objectUrl);
@@ -222,15 +310,33 @@ const ScriptMenu: React.FC = () => {
   };
 
   return (
-    <div className="flex w-full flex-col gap-3 overflow-auto p-4 text-sm">
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+    <div className="flex h-full w-full flex-col gap-3 overflow-hidden p-4 text-sm">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex h-full w-full flex-col">
+        <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
           <TabsTrigger value="generate">Generate Video</TabsTrigger>
           <TabsTrigger value="pending">Pending Videos</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="generate" className="mt-4">
-          <div className="flex w-full flex-col gap-3">
+        <TabsContent value="generate" className="mt-4 flex-1 overflow-auto">
+          {/* Timeline loading overlay */}
+          {addingToTimeline && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-3 rounded-lg bg-card p-6 shadow-lg">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <div className="text-center">
+                  <p className="text-sm font-medium">Adding video to timeline...</p>
+                  <p className="text-xs text-muted-foreground">Downloading video</p>
+                </div>
+                <div className="w-48">
+                  <Progress value={timelineProgress} className="h-2" />
+                  <p className="text-xs text-center text-muted-foreground mt-1">
+                    {timelineProgress}%
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className={`flex w-full flex-col gap-3 ${addingToTimeline ? 'pointer-events-none opacity-50' : ''}`}>
             <Button
               className="flex gap-1 border border-border"
               variant="outline"
@@ -260,6 +366,101 @@ const ScriptMenu: React.FC = () => {
               onChange={handleFilesSelected}
             />
 
+            {/* Asset Picker */}
+            {projectId && (
+              <AssetPicker
+                projectId={projectId}
+                onSelect={handleAssetSelect}
+                selectedAssetId={selectedAsset?.id}
+                onBack={() => {
+                  setSelectedAsset(null);
+                  setUploadedUrl(null);
+                  setVideoUploaded(false);
+                  // Clear script and other populated data when deselecting asset
+                  setScript(null);
+                  setSelectedVoice(null);
+                  setSelectedAvatar(null);
+                  setWidth(1080);
+                  setHeight(1920);
+                }}
+                onAddToTimeline={async (asset) => {
+                  if (addingToTimeline) return;
+                  
+                  try {
+                    setAddingToTimeline(true);
+                    setTimelineProgress(0);
+
+                    const response = await fetch(asset.url);
+                    if (!response.ok) {
+                      throw new Error(`Failed to download: ${response.status}`);
+                    }
+
+                    const total = Number(response.headers.get("content-length"));
+                    if (response.body && total) {
+                      const reader = response.body.getReader();
+                      let received = 0;
+                      const chunks: Uint8Array[] = [];
+
+                      while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        if (value) {
+                          chunks.push(value);
+                          received += value.length;
+                          setTimelineProgress(Math.round((received / total) * 100));
+                        }
+                      }
+
+                      const videoBlob = new Blob(chunks, { type: "video/mp4" });
+                      const blobUrl = URL.createObjectURL(videoBlob);
+
+                      dispatch(ADD_VIDEO, {
+                        payload: {
+                          id: generateId(),
+                          details: { src: asset.url },
+                          metadata: { previewUrl: blobUrl },
+                        },
+                        options: { resourceId: "main", scaleMode: "fit" },
+                      });
+                    } else {
+                      // Fallback for when content-length is not available
+                      const videoBlob = await response.blob();
+                      const blobUrl = URL.createObjectURL(videoBlob);
+
+                      dispatch(ADD_VIDEO, {
+                        payload: {
+                          id: generateId(),
+                          details: { src: asset.url },
+                          metadata: { previewUrl: blobUrl },
+                        },
+                        options: { resourceId: "main", scaleMode: "fit" },
+                      });
+                    }
+                  } catch (err) {
+                    console.error("Failed to add video to timeline:", err);
+                    alert("Failed to add video to timeline: " + (err as Error).message);
+                  } finally {
+                    setAddingToTimeline(false);
+                    setTimelineProgress(0);
+                  }
+                }}
+                onGenerateScript={(asset) => {
+                  // Set selected asset and trigger script generation
+                  setSelectedAsset(asset);
+                  setUploadedUrl(asset.url);
+                  setVideoUploaded(true);
+                }}
+              />
+            )}
+
+            {/* Loading indicator for asset details */}
+            {loadingAssetDetails && (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="ml-2 text-sm text-muted-foreground">Loading asset details...</span>
+              </div>
+            )}
+
             {videoUploaded && (
               <div className="flex flex-col gap-2">
                 <Textarea
@@ -283,7 +484,7 @@ const ScriptMenu: React.FC = () => {
                         query_text: '',
                         context: context || '',
                         media_file: '',
-                        media_url: uploadedUrl,
+                        media_url: encodeURI(uploadedUrl),
                         creative_gallery_id: ''
                       });
                       
@@ -296,7 +497,9 @@ const ScriptMenu: React.FC = () => {
                       const scriptText = String(text);
                       
                       if (scriptText.length > 500) {
-                        setScriptError(`Generated script is ${scriptText.length} characters (limit: 500). Please use a shorter video to avoid generation failures.`);
+                        setScriptWarning(`Generated script is ${scriptText.length} characters (limit: 500). Please use a shorter video to avoid generation failures.`);
+                      } else {
+                        setScriptWarning(null);
                       }
                       
                       setScript(scriptText);
@@ -315,6 +518,12 @@ const ScriptMenu: React.FC = () => {
                 {scriptError && (
                   <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
                     {scriptError}
+                  </div>
+                )}
+                
+                {scriptWarning && (
+                  <div className="p-3 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md">
+                    ⚠️ {scriptWarning}
                   </div>
                 )}
               </div>
@@ -356,7 +565,25 @@ const ScriptMenu: React.FC = () => {
                     {selectedVoice ? "Change voice" : "Select voice"}
                   </Button>
                 </div>
-                <div className="mt-1 flex flex-col gap-2">
+
+                {selectedVoice && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Selected voice:{" "}
+                    <span className="font-medium text-foreground">
+                      {selectedVoice.name}
+                    </span>
+                  </p>
+                )}
+                {selectedAvatar && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Selected avatar:{" "}
+                    <span className="font-medium text-foreground">
+                      {selectedAvatar.avatar_name}
+                    </span>
+                  </p>
+                )}
+
+                <div className="mt-3 flex flex-col gap-2">
                   <p className="text-xs text-muted-foreground">Resolution</p>
                   <div className="flex w-full items-center gap-2">
                     <Input
@@ -376,23 +603,6 @@ const ScriptMenu: React.FC = () => {
                     />
                   </div>
                 </div>
-
-                {selectedVoice && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Selected voice:{" "}
-                    <span className="font-medium text-foreground">
-                      {selectedVoice.name}
-                    </span>
-                  </p>
-                )}
-                {selectedAvatar && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Selected avatar:{" "}
-                    <span className="font-medium text-foreground">
-                      {selectedAvatar.avatar_name}
-                    </span>
-                  </p>
-                )}
                 <AvatarPickerDialog
                   open={avatarDialogOpen}
                   onOpenChange={setAvatarDialogOpen}
@@ -405,46 +615,17 @@ const ScriptMenu: React.FC = () => {
                     setSelectedVoice({ voice_id: v.voice_id, name: v.name })
                   }
                 />
-                {selectedAvatar &&
-                  selectedVoice &&
-                  (videoStatus === "processing" ||
-                  (videoStatus === "completed" &&
-                    !videoAdded &&
-                    addPhase !== "done") ? (
-                    <div className="mt-3 flex w-full flex-col items-center gap-1">
-                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                      <p className="text-xs text-muted-foreground">
-                        {videoStatus === "processing"
-                          ? `Current Status: ${videoStatus}. this can take a few minutes`
-                          : addPhase === "downloading"
-                            ? "Downloading processed video…"
-                            : addPhase === "adding"
-                              ? "Adding video to timeline…"
-                              : "Finalizing…"}
-                      </p>
-                    </div>
-                  ) : videoStatus === "completed" && videoUrl && videoAdded ? (
-                    <Button asChild className="mt-3 w-full" variant="default">
-                      <a
-                        href={videoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
-                      >
-                        Download video
-                      </a>
-                    </Button>
-                  ) : (
-                    <Button
-                      className="mt-3 w-full"
-                      variant="default"
-                      disabled={
-                        creating || (videoStatus as any) === "processing" || !script
-                      }
-                      onClick={async () => {
+                <Button
+                  className="mt-3 w-full"
+                  variant="default"
+                  disabled={
+                    creating || ["processing", "pending"].includes(videoStatus) || !script || !selectedAvatar || !selectedVoice
+                  }
+                  onClick={async () => {
                         if (!selectedAvatar || !selectedVoice || !script)
                           return;
-                        setVideoStatus("processing");
+                        // Reset any previous error state
+                        setVideoStatus("pending");
                         setActiveTab("pending");
                         setVideoAdded(false);
                         setCreating(true);
@@ -468,6 +649,15 @@ const ScriptMenu: React.FC = () => {
                             voice_id: selectedVoice.voice_id,
                             width,
                             height,
+                            // Store metadata for later retrieval
+                            metadata: {
+                              script: script,
+                              voice_id: selectedVoice.voice_id,
+                              voice_name: selectedVoice.name,
+                              avatar_id: selectedAvatar.avatar_id ?? selectedAvatar.avatar_pose_id ?? selectedAvatar.avatarId,
+                              avatar_name: selectedAvatar.avatar_name,
+                              dimensions: { width, height },
+                            },
                           });
                           const vid =
                             data?.data?.heygen_response?.data?.video_id;
@@ -482,7 +672,9 @@ const ScriptMenu: React.FC = () => {
                           setVideoStatus("processing");
                           setVideoUrl(null);
                         } catch (err: any) {
-                          alert(err.message ?? "Error");
+                          console.error("Video creation error:", err);
+                          alert(err.message ?? "Error creating video");
+                          setVideoStatus("error");
                         } finally {
                           setCreating(false);
                         }
@@ -490,52 +682,57 @@ const ScriptMenu: React.FC = () => {
                     >
                       {creating
                         ? "Creating…"
-                        : (videoStatus as any) === "processing"
-                          ? "Processing…"
-                          : "Create video"}
+                        : videoStatus === "error"
+                          ? "Retry video creation"
+                          : "Generate video"}
                     </Button>
-                  ))}
 
 
-                {videoStatus === "processing" ||
-                (videoStatus === "completed" &&
-                  !videoAdded &&
-                  addPhase !== "done") ? (
-                  <div className="mt-3 flex w-full flex-col items-center gap-1"></div>
-                ) : videoStatus === "completed" &&
-                  videoUrl &&
-                  !videoAdded &&
-                  addPhase === "done" ? (
-                  <div className="mt-3 flex w-full gap-2">
-                    <Button asChild variant="secondary" className="flex-1">
-                      <a
-                        href={videoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
-                      >
-                        Download
-                      </a>
-                    </Button>
-                    <Button
-                      className="flex-1"
-                      onClick={handleAddToTimeline}
-                      variant="default"
-                    >
-                      Add to timeline
-                    </Button>
-                  </div>
-                ) : videoStatus === "completed" && videoUrl && videoAdded ? (
-                  <div></div>
-                ) : (
-                  <></>
-                )}
+                    {/* Completed state - show download and add to timeline buttons */}
+                    {videoStatus === "completed" &&
+                      videoUrl &&
+                      !videoAdded &&
+                      addPhase === "done" && (
+                      <div className="mt-3 flex w-full gap-2">
+                        <Button asChild variant="secondary" className="flex-1">
+                          <a
+                            href={videoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                          >
+                            Download
+                          </a>
+                        </Button>
+                        <Button
+                          className="flex-1"
+                          onClick={handleAddToTimeline}
+                          variant="default"
+                        >
+                          Add to timeline
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Video already added - show download button */}
+                    {videoStatus === "completed" && videoUrl && videoAdded && (
+                      <Button asChild className="mt-3 w-full" variant="default">
+                        <a
+                          href={videoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                        >
+                          Download video
+                        </a>
+                      </Button>
+                    )}
               </>
             )}
           </div>
         </TabsContent>
 
-        <TabsContent value="pending" className="mt-4">
+        <TabsContent value="pending" className="mt-4 flex-1 overflow-auto">
           <PendingHeyGenExports projectId={projectId} />
         </TabsContent>
       </Tabs>
