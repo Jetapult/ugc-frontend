@@ -14,7 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ChevronDown, Download, PlusIcon, Save } from "lucide-react";
+import { ChevronDown, Download, PlusIcon, Save, RotateCcw } from "lucide-react";
 import UGCExportsDialog from "./ugc-exports-dialog";
 import { Label } from "@/components/ui/label";
 import type StateManager from "@designcombo/state";
@@ -30,16 +30,20 @@ export default function Navbar({
   setProjectName,
   projectName,
   onSave,
+  onReset,
 }: {
   user: null;
   stateManager: StateManager;
   setProjectName: (name: string) => void;
   projectName: string;
   onSave?: () => void;
+  onReset?: () => void;
 }) {
   const { logout } = useAuth();
   const { projectId } = useParams<{ projectId?: string }>();
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleAddFiles = () => {
@@ -58,7 +62,22 @@ export default function Navbar({
     } finally {
       setSaving(false);
     }
-  }, [onSave, saving]);
+  }, [onSave]);
+
+  const handleReset = useCallback(async () => {
+    if (!onReset || resetting) return;
+
+    setResetting(true);
+    try {
+      await onReset();
+      console.log("Project reset successfully");
+      setShowResetConfirm(false);
+    } catch (error) {
+      console.error("Failed to reset project:", error);
+    } finally {
+      setResetting(false);
+    }
+  }, [onReset, resetting]);
 
   // Keyboard shortcut for save (Cmd+S / Ctrl+S)
   useEffect(() => {
@@ -221,6 +240,51 @@ export default function Navbar({
             )}
             {saving ? "Saving..." : "Save"}
           </Button>
+          <Popover open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+            <PopoverTrigger asChild>
+              <Button
+                className="flex h-8 gap-1 border border-border text-orange-400 hover:bg-orange-500/10"
+                variant="outline"
+              >
+                <RotateCcw width={18} />
+                Reset
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="z-[250] flex w-80 flex-col gap-4 border border-border bg-zinc-900 p-4"
+            >
+              <div>
+                <h3 className="text-sm font-medium text-white">Reset Project</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  This will permanently delete all timeline items, tracks, and project data. This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setShowResetConfirm(false)}
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleReset}
+                  disabled={resetting || !onReset}
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1"
+                >
+                  {resetting ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
+                  ) : (
+                    "Reset Project"
+                  )}
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button
             onClick={logout}
             className="flex h-8 gap-1 border border-border text-red-400 hover:bg-red-500/10"

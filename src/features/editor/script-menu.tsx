@@ -84,45 +84,74 @@ const ScriptMenu: React.FC = () => {
     setUploadedUrl(asset.url);
     setVideoUploaded(true);
     
-    // If it's a HeyGen export, fetch details and populate data
+    // If it's a HeyGen export, try to populate data from metadata first, then API
     if (asset.type === "heygen_export") {
       setLoadingAssetDetails(true);
-      try {
-        const response = await api.heygenExports.getDetails(asset.id);
-        const details = response.data;
-        
-        // Populate script if available
-        if (details.script) {
-          setScript(details.script);
-        }
-        
-        // Populate voice if available
-        if (details.voice_id && details.voice_name) {
-          setSelectedVoice({
-            voice_id: details.voice_id,
-            name: details.voice_name,
-          });
-        }
-        
-        // Populate avatar if available
-        if (details.avatar_id && details.avatar_name) {
-          setSelectedAvatar({
-            avatar_id: details.avatar_id,
-            avatar_name: details.avatar_name,
-          });
-        }
-        
-        // Set dimensions if available
-        if (details.dimensions) {
-          setWidth(details.dimensions.width);
-          setHeight(details.dimensions.height);
-        }
-        
-      } catch (err) {
-        console.error("Failed to fetch HeyGen export details:", err);
-      } finally {
-        setLoadingAssetDetails(false);
+      
+      // First, check if data is available in asset metadata
+      const metadata = asset.metadata as any;
+      console.log("HeyGen asset metadata:", metadata);
+      
+      // Try to populate from metadata first
+      if (metadata?.script) {
+        setScript(metadata.script);
       }
+      if (metadata?.voice_id && metadata?.voice_name) {
+        setSelectedVoice({
+          voice_id: metadata.voice_id,
+          name: metadata.voice_name,
+        });
+      }
+      if (metadata?.avatar_id && metadata?.avatar_name) {
+        setSelectedAvatar({
+          avatar_id: metadata.avatar_id,
+          avatar_name: metadata.avatar_name,
+        });
+      }
+      if (metadata?.dimensions || (metadata?.width && metadata?.height)) {
+        setWidth(metadata.dimensions?.width || metadata.width || 1280);
+        setHeight(metadata.dimensions?.height || metadata.height || 720);
+      }
+      
+      // If no metadata found, try the API call as fallback
+      if (!metadata?.script) {
+        try {
+          const response = await api.heygenExports.getDetails(asset.id);
+          const details = response.data;
+          
+          // Populate script if available
+          if (details.script) {
+            setScript(details.script);
+          }
+          
+          // Populate voice if available
+          if (details.voice_id && details.voice_name) {
+            setSelectedVoice({
+              voice_id: details.voice_id,
+              name: details.voice_name,
+            });
+          }
+          
+          // Populate avatar if available
+          if (details.avatar_id && details.avatar_name) {
+            setSelectedAvatar({
+              avatar_id: details.avatar_id,
+              avatar_name: details.avatar_name,
+            });
+          }
+          
+          // Set dimensions if available
+          if (details.dimensions) {
+            setWidth(details.dimensions.width);
+            setHeight(details.dimensions.height);
+          }
+          
+        } catch (err) {
+          console.error("Failed to fetch HeyGen export details:", err);
+        }
+      }
+      
+      setLoadingAssetDetails(false);
     } else {
       // Clear any previous script when selecting a non-HeyGen asset
       setScript(null);
@@ -620,6 +649,15 @@ const ScriptMenu: React.FC = () => {
                             voice_id: selectedVoice.voice_id,
                             width,
                             height,
+                            // Store metadata for later retrieval
+                            metadata: {
+                              script: script,
+                              voice_id: selectedVoice.voice_id,
+                              voice_name: selectedVoice.name,
+                              avatar_id: selectedAvatar.avatar_id ?? selectedAvatar.avatar_pose_id ?? selectedAvatar.avatarId,
+                              avatar_name: selectedAvatar.avatar_name,
+                              dimensions: { width, height },
+                            },
                           });
                           const vid =
                             data?.data?.heygen_response?.data?.video_id;

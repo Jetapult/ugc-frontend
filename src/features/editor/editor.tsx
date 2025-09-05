@@ -43,7 +43,7 @@ const Editor = ({ initialEditorState, projectName: initialProjectName }: EditorP
   const timelinePanelRef = useRef<ImperativePanelHandle>(null);
   const { timeline, playerRef } = useStore();
   const { token } = useAuth();
-  const { saveState, restoreState } = useProjectState(stateManager);
+  const { saveState, restoreState, resetState } = useProjectState(stateManager);
 
   useTimelineEvents();
 
@@ -70,13 +70,16 @@ const Editor = ({ initialEditorState, projectName: initialProjectName }: EditorP
     ]);
   }, []);
 
-  // Restore editor state when provided
+  // Restore editor state when provided - simple approach
   useEffect(() => {
     if (initialEditorState) {
       console.log('Restoring editor state from project:', initialEditorState);
-      restoreState(initialEditorState as any);
+      // Simple restoration without aggressive timeline manipulation
+      setTimeout(() => {
+        restoreState(initialEditorState as any);
+      }, 200);
     }
-  }, [initialEditorState, restoreState]);
+  }, [initialEditorState]);
 
   useEffect(() => {
     const screenHeight = window.innerHeight;
@@ -119,6 +122,7 @@ const Editor = ({ initialEditorState, projectName: initialProjectName }: EditorP
         stateManager={stateManager}
         setProjectName={setProjectName}
         onSave={saveState}
+        onReset={resetState}
       />
       <div className="flex flex-1">
         <ResizablePanelGroup style={{ flex: 1 }} direction="vertical">
