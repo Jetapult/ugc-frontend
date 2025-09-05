@@ -2,6 +2,7 @@ import { dispatch } from "@designcombo/events";
 import { ADD_AUDIO, ADD_IMAGE, ADD_VIDEO } from "@designcombo/state";
 import { generateId } from "@designcombo/timeline";
 import React, { useCallback, useState } from "react";
+import { useDownloadState } from "../store/use-download-state";
 
 enum AcceptedDropTypes {
   IMAGE = "image",
@@ -22,7 +23,7 @@ interface DroppableAreaProps {
   id?: string;
 }
 
-const useDragAndDrop = (onDragStateChange?: (isDragging: boolean) => void) => {
+const useDragAndDrop = (onDragStateChange?: (isDragging: boolean) => void, projectId?: string) => {
   const [isPointerInside, setIsPointerInside] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
@@ -91,7 +92,7 @@ const useDragAndDrop = (onDragStateChange?: (isDragging: boolean) => void) => {
           let publicUrl: string = previewUrl;
           try {
             const { uploadFile } = await import("../../../utils/upload");
-            publicUrl = await uploadFile(file);
+            publicUrl = await uploadFile(file, projectId || "default");
           } catch (err) {
             console.error("Upload failed, using previewUrl", err);
           }
@@ -139,13 +140,16 @@ const useDragAndDrop = (onDragStateChange?: (isDragging: boolean) => void) => {
 
 export const DroppableArea: React.FC<DroppableAreaProps> = ({
   children,
-  className,
-  style,
+  className = "",
+  style = {},
   onDragStateChange,
   id,
 }) => {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const { projectId } = useDownloadState();
+
   const { onDragEnter, onDragOver, onDrop, onDragLeave } =
-    useDragAndDrop(onDragStateChange);
+    useDragAndDrop(onDragStateChange, projectId);
 
   return (
     <div
