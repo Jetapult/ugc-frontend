@@ -228,6 +228,185 @@ export default function Navbar({
             <PlusIcon width={18} /> Add file
           </Button>
           <Button
+            onClick={() => {
+              console.log("🔧 Manual restore triggered");
+              const savedState = localStorage.getItem('remotion-editor-state');
+              if (savedState) {
+                const state = JSON.parse(savedState);
+                console.log("📋 Saved state:", state);
+                
+                // Manually set state
+                Object.keys(state).forEach((key) => {
+                  (stateManager as any)[key] = state[key];
+                });
+                
+                console.log("📊 StateManager after manual restore:", stateManager.getState());
+                
+                // Force all subscriptions
+                setTimeout(() => {
+                  ['notifyStateSubscribers', 'notifyAddRemoveSubscribers', 'notifyTrackItemSubscribers'].forEach(method => {
+                    if (typeof (stateManager as any)[method] === "function") {
+                      (stateManager as any)[method]();
+                      console.log(`✅ Manually triggered ${method}`);
+                    }
+                  });
+                }, 100);
+              } else {
+                console.log("❌ No saved state found");
+              }
+            }}
+            className="flex h-8 gap-1 border border-border bg-blue-600 hover:bg-blue-700"
+            variant="outline"
+          >
+            🔄 Restore
+          </Button>
+          <Button
+            onClick={() => {
+              console.log("🧪 Testing proper dispatch ADD_VIDEO");
+              
+              // Use a different, known-good video URL
+              const testPayload: IVideo = {
+                id: generateId(),
+                type: "video",
+                details: {
+                  src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4", // Use a different test video
+                  width: 360,
+                  height: 640,
+                } as any,
+                metadata: {
+                  name: "Test Video - Big Buck Bunny",
+                }
+              } as any;
+              
+              console.log("📋 Test payload:", testPayload);
+              
+              // Use proper dispatch method like other components do
+              dispatch(ADD_VIDEO, {
+                payload: testPayload,
+                options: { resourceId: "main", scaleMode: "fit" },
+              });
+              
+              console.log("✅ Dispatched ADD_VIDEO event");
+              
+              // Check StateManager after dispatch
+              setTimeout(() => {
+                console.log("📊 StateManager after dispatch:", stateManager.getState());
+              }, 500);
+              
+              // Add a second video with delay to test multiple videos
+              setTimeout(() => {
+                console.log("🧪 Adding second test video...");
+                const secondPayload: IVideo = {
+                  id: generateId(),
+                  type: "video",
+                  details: {
+                    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4", // Different video
+                    width: 360,
+                    height: 640,
+                  } as any,
+                  metadata: {
+                    name: "Test Video 2 - Elephants Dream",
+                  }
+                } as any;
+                
+                console.log("📋 Second test payload:", secondPayload);
+                
+                dispatch(ADD_VIDEO, {
+                  payload: secondPayload,
+                  options: { resourceId: "main", scaleMode: "fit" },
+                });
+                
+                console.log("✅ Dispatched second ADD_VIDEO event");
+                
+                // Check StateManager after second dispatch
+                setTimeout(() => {
+                  console.log("📊 StateManager after second video:", stateManager.getState());
+                  const state = stateManager.getState();
+                  console.log("📊 Total videos in timeline:", state.trackItemIds?.length || 0);
+                }, 500);
+              }, 1500); // 1.5 second delay
+            }}
+            className="flex h-8 gap-1 border border-border bg-purple-600 hover:bg-purple-700"
+            variant="outline"
+          >
+            🧪 Test Track
+          </Button>
+          <Button
+            onClick={() => {
+              console.log("🧹 Clearing corrupted localStorage...");
+              localStorage.removeItem('remotion-editor-state');
+              console.log("✅ localStorage cleared");
+              
+              // Also reset current state
+              const defaultState = {
+                tracks: [],
+                trackItemIds: [],
+                trackItemsMap: {},
+                trackItemDetailsMap: {},
+                transitionIds: [],
+                transitionsMap: {},
+                duration: 1000,
+                fps: 30,
+                size: { width: 1080, height: 1920 },
+              };
+
+              Object.keys(defaultState).forEach((key) => {
+                (stateManager as any)[key] = (defaultState as any)[key];
+              });
+
+              // Trigger subscriptions
+              setTimeout(() => {
+                ['notifyStateSubscribers', 'notifyAddRemoveSubscribers'].forEach(method => {
+                  if (typeof (stateManager as any)[method] === "function") {
+                    (stateManager as any)[method]();
+                  }
+                });
+              }, 100);
+            }}
+            className="flex h-8 gap-1 border border-border bg-red-600 hover:bg-red-700"
+            variant="outline"
+          >
+            🧹 Clear All
+          </Button>
+          <Button
+            onClick={() => {
+              console.log("🔍 Debugging current state...");
+              const currentState = stateManager.getState();
+              console.log("📊 Full StateManager state:", currentState);
+              
+              if (currentState.trackItemsMap) {
+                console.log("📹 Current video items:");
+                Object.keys(currentState.trackItemsMap).forEach(id => {
+                  const item = currentState.trackItemsMap[id];
+                  if (item.type === 'video') {
+                    console.log(`- ${id}:`, {
+                      src: item.details?.src || (item as any).src,
+                      metadata: item.metadata,
+                      details: item.details
+                    });
+                  }
+                });
+              }
+              
+              console.log("💾 localStorage content:");
+              const saved = localStorage.getItem('remotion-editor-state');
+              if (saved) {
+                try {
+                  const parsed = JSON.parse(saved);
+                  console.log("📋 Saved state:", parsed);
+                } catch (e) {
+                  console.log("❌ Corrupted localStorage:", e);
+                }
+              } else {
+                console.log("ℹ️ No saved state");
+              }
+            }}
+            className="flex h-8 gap-1 border border-border bg-yellow-600 hover:bg-yellow-700"
+            variant="outline"
+          >
+            🔍 Debug
+          </Button>
+          <Button
             onClick={handleSave}
             disabled={saving || !onSave}
             className="flex h-8 gap-1 border border-border text-green-400 hover:bg-green-500/10 disabled:opacity-50"

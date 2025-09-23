@@ -70,16 +70,21 @@ const Editor = ({ initialEditorState, projectName: initialProjectName }: EditorP
     ]);
   }, []);
 
-  // Restore editor state when provided - simple approach
+  // Auto-restore with error handling
   useEffect(() => {
-    if (initialEditorState) {
-      console.log('Restoring editor state from project:', initialEditorState);
-      // Simple restoration without aggressive timeline manipulation
+    if (timeline) {
+      console.log('🔄 Timeline ready, auto-restoring state...');
       setTimeout(() => {
-        restoreState(initialEditorState as any);
-      }, 200);
+        try {
+          restoreState();
+        } catch (error) {
+          console.error('❌ Auto-restore failed:', error);
+          console.log('🧹 Clearing corrupted data...');
+          localStorage.removeItem('remotion-editor-state');
+        }
+      }, 500); // Wait for timeline to be fully initialized
     }
-  }, [initialEditorState]);
+  }, [timeline, restoreState]);
 
   useEffect(() => {
     const screenHeight = window.innerHeight;
