@@ -2,6 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Disable swipe navigation globally */
+html, body {
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: auto;
+}
+
+/* Prevent horizontal swipe gestures from triggering browser navigation */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Re-enable text selection where needed */
+input, textarea, [contenteditable] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Specific timeline scroll behavior */
+.timeline-container, canvas {
+  overscroll-behavior-x: none;
+  touch-action: pan-x pan-y;
+}
+
 @layer base {
   :root {
     --foreground-rgb: 0, 0, 0;
