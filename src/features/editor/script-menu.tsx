@@ -280,7 +280,6 @@ const ScriptMenu: React.FC = () => {
       // Create video object for timeline
       // Validate video URL before adding
       if (!videoUrl || videoUrl.includes('undefined') || videoUrl === 'undefined') {
-        console.error('❌ Invalid video URL:', videoUrl);
         alert('Invalid video URL. Please try again.');
         setAddPhase("done");
         return;
@@ -296,12 +295,8 @@ const ScriptMenu: React.FC = () => {
         } as any,
         metadata: {
           name: fileName || "Generated Video",
-          // Don't include blobUrl as it can cause issues
         },
       } as any;
-
-      console.log('📹 Adding video with payload:', payload);
-      console.log('🔗 Video URL:', videoUrl);
       
       // Dispatch event to add to timeline
       dispatch(ADD_VIDEO, {

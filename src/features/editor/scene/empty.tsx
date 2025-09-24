@@ -89,6 +89,18 @@ const SceneEmpty = () => {
     }
   };
 
+  const handlePlusButtonClick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'video/*';
+    input.multiple = true;
+    input.onchange = (e) => {
+      const files = Array.from((e.target as HTMLInputElement).files || []);
+      onSelectFiles(files);
+    };
+    input.click();
+  };
+
   return (
     <div ref={containerRef} className="absolute z-50 flex h-full w-full flex-1">
       {!isLoading ? (
@@ -96,7 +108,7 @@ const SceneEmpty = () => {
           maxFileCount={4}
           maxSize={1024 * 1024 * 1024} // allow up to 1 GB
           disabled={false}
-          onValueChange={onSelectFiles}
+          onValueChange={() => {}} // Disable file selection but keep visual layout
           className="h-full w-full flex-1 bg-background"
         >
           <DroppableArea
@@ -109,12 +121,15 @@ const SceneEmpty = () => {
               height: desiredSize.height,
             }}
           >
-            <div className="flex flex-col items-center justify-center gap-4 pb-12">
-              <div className="hover:bg-primary-dark cursor-pointer rounded-md border bg-primary p-2 text-secondary transition-colors duration-200">
+            <div className="flex flex-col items-center justify-center gap-4 pb-12 pointer-events-none">
+              <div 
+                className="hover:bg-primary-dark cursor-pointer rounded-md border bg-primary p-2 text-secondary transition-colors duration-200 pointer-events-auto"
+                onClick={handlePlusButtonClick}
+              >
                 <PlusIcon className="h-5 w-5" aria-hidden="true" />
               </div>
               <div className="flex flex-col gap-px">
-                <p className="text-sm text-muted-foreground">Click to upload</p>
+                <p className="text-sm text-muted-foreground">Click the + button to upload</p>
                 <p className="text-xs text-muted-foreground/70">
                   Or drag and drop files here
                 </p>

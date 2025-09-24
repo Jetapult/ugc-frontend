@@ -99,25 +99,15 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
   };
 
   useEffect(() => {
-    console.log('🔄 Timeline useEffect: Starting initialization...');
     const canvasEl = canvasElRef.current;
     const timelineContainerEl = timelineContainerRef.current;
 
-    console.log('🎯 Timeline elements check:', {
-      canvasEl: !!canvasEl,
-      timelineContainerEl: !!timelineContainerEl,
-      canvasElId: canvasEl?.id
-    });
-
     if (!canvasEl || !timelineContainerEl) {
-      console.log('❌ Timeline elements not ready, skipping initialization');
       return;
     }
 
     const containerWidth = timelineContainerEl.clientWidth - 40;
     const containerHeight = timelineContainerEl.clientHeight - 90;
-    
-    console.log('📐 Timeline container dimensions:', { containerWidth, containerHeight });
     
     const canvas = new CanvasTimeline(canvasEl, {
       width: containerWidth,
@@ -158,7 +148,6 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
       guideLineColor: "#ffffff",
     });
 
-    console.log('✅ CanvasTimeline created:', canvas);
     canvasRef.current = canvas;
 
     setCanvasSize({ width: containerWidth, height: containerHeight });
@@ -167,11 +156,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
       height: 0,
     });
     
-    console.log('🔗 Setting timeline in store...');
     setTimeline(canvas);
-    console.log('✅ Timeline set in store');
-
-    console.log('🔔 Setting up StateManager subscriptions...');
     
     const resizeDesignSubscription = stateManager.subscribeToSize(
       (newState) => {
@@ -183,13 +168,11 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
     });
 
     const tracksSubscription = stateManager.subscribeToState((newState) => {
-      console.log('🔔 Timeline: State subscription triggered with:', newState);
       setState(newState);
       
       // Force canvas to re-render
       setTimeout(() => {
         if (canvas) {
-          console.log('🎨 Timeline: Forcing canvas re-render');
           (canvas as any).requestRenderAll?.();
           (canvas as any).renderAll?.();
         }
@@ -224,7 +207,6 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
         // Force canvas to re-render
         setTimeout(() => {
           if (canvas) {
-            console.log('🎨 Timeline: Forcing canvas re-render after add/remove');
             (canvas as any).requestRenderAll?.();
             (canvas as any).renderAll?.();
           }
@@ -240,11 +222,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
         });
       });
 
-    console.log('✅ All StateManager subscriptions set up successfully');
-    console.log('📊 Timeline initialization complete');
-
     return () => {
-      console.log('🧹 Timeline cleanup starting...');
       canvas.purge();
       scaleSubscription.unsubscribe();
       tracksSubscription.unsubscribe();

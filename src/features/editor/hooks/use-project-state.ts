@@ -8,11 +8,8 @@ export const useProjectState = (stateManager: StateManager) => {
   // Simple save using Remotion's built-in state management
   const saveState = useCallback(() => {
     try {
-      console.log('💾 Saving state to localStorage...');
       const state = stateManager.getState();
-      console.log('📊 State being saved:', state);
       localStorage.setItem('remotion-editor-state', JSON.stringify(state));
-      console.log('✅ State saved successfully');
     } catch (error) {
       console.error("Failed to save state:", error);
     }
@@ -39,20 +36,14 @@ export const useProjectState = (stateManager: StateManager) => {
         size: { width: 1080, height: 1920 },
       };
 
+      // Set each property
       Object.keys(defaultState).forEach((key) => {
         (stateManager as any)[key] = (defaultState as any)[key];
       });
 
-      // Trigger subscriptions
+      // Trigger subscriptions to update UI
       setTimeout(() => {
-        const notificationMethods = [
-          'notifyStateSubscribers',
-          'notifyDurationSubscribers',
-          'notifyTrackItemSubscribers', 
-          'notifyAddRemoveSubscribers'
-        ];
-
-        notificationMethods.forEach(method => {
+        ['notifyStateSubscribers', 'notifyAddRemoveSubscribers'].forEach(method => {
           if (typeof (stateManager as any)[method] === "function") {
             (stateManager as any)[method]();
           }
@@ -68,23 +59,16 @@ export const useProjectState = (stateManager: StateManager) => {
   // Restore using proper dispatch events like the working test button
   const restoreState = useCallback(() => {
     try {
-      console.log('🔄 Restoring state from localStorage...');
       const savedState = localStorage.getItem('remotion-editor-state');
       
       if (savedState) {
         const state = JSON.parse(savedState);
-        console.log('📋 Found saved state:', state);
-        console.log('📊 State has tracks:', state.tracks?.length || 0);
-        console.log('📊 State has trackItems:', state.trackItemIds?.length || 0);
         
         // First clear current state by resetting
-        console.log('🧹 Clearing current state...');
         resetState();
         
         // Wait a bit for reset to complete, then restore items
         setTimeout(() => {
-          console.log('🔄 Restoring items using dispatch events...');
-          
           // Restore each track item using proper dispatch events with delays
           if (state.trackItemsMap && state.trackItemIds) {
             state.trackItemIds.forEach((itemId: string, index: number) => {
@@ -92,25 +76,14 @@ export const useProjectState = (stateManager: StateManager) => {
               if (item) {
                 // Add delay between items to help with layers
                 setTimeout(() => {
-                  console.log(`📦 Restoring ${item.type} item:`, item);
-                  console.log('📍 Item position data:', {
-                    top: item.details?.top,
-                    left: item.details?.left,
-                    transform: item.details?.transform,
-                    opacity: item.details?.opacity
-                  });
-                  
                   if (item.type === 'video') {
                     // Fix blob URL issue - use actual src from details, not blob
                     let videoSrc = item.details?.src || item.src;
                     
                     // Skip blob URLs and corrupted URLs
                     if (!videoSrc || videoSrc.startsWith('blob:') || videoSrc.includes('undefined')) {
-                      console.log('⚠️ Skipping invalid video src:', videoSrc);
                       return;
                     }
-                    
-                    console.log('🔗 Video src being restored:', videoSrc);
                     
                     // Create a clean payload with position data preserved
                     const cleanPayload = {
@@ -144,12 +117,14 @@ export const useProjectState = (stateManager: StateManager) => {
                       }
                     };
                     
-                    console.log('📦 Clean video payload:', cleanPayload);
-                    
-                    dispatch(ADD_VIDEO, {
-                      payload: cleanPayload,
-                      options: { resourceId: "main", scaleMode: "fit" },
-                    });
+                    try {
+                      dispatch(ADD_VIDEO, {
+                        payload: cleanPayload,
+                        options: { resourceId: "main", scaleMode: "fit" },
+                      });
+                    } catch (error) {
+                      console.error('Failed to dispatch video:', error);
+                    }
                   } else if (item.type === 'audio') {
                     dispatch(ADD_AUDIO, {
                       payload: {
@@ -185,12 +160,7 @@ export const useProjectState = (stateManager: StateManager) => {
               }
             });
           }
-          
-          console.log('✅ State restoration completed using dispatch events');
         }, 200);
-        
-      } else {
-        console.log('ℹ️ No saved state found');
       }
     } catch (error) {
       console.error("Failed to restore state:", error);
