@@ -68,18 +68,40 @@ const Editor = ({ initialEditorState, projectName: initialProjectName }: EditorP
         url: SECONDARY_FONT_URL,
       },
     ]);
+    
+    // Suppress annoying deprecation warnings
+    const originalWarn = console.warn;
+    const originalError = console.error;
+    
+    console.warn = (...args) => {
+      const message = args.join(' ');
+      if (message.includes('findDOMNode is deprecated') || 
+          message.includes('findDOMNode') ||
+          message.includes('react-draggable')) {
+        return; // Ignore these warnings
+      }
+      originalWarn.apply(console, args);
+    };
+    
+    console.error = (...args) => {
+      const message = args.join(' ');
+      if (message.includes('findDOMNode is deprecated') || 
+          message.includes('findDOMNode') ||
+          message.includes('react-draggable')) {
+        return; // Ignore these errors too
+      }
+      originalError.apply(console, args);
+    };
   }, []);
 
   // Auto-restore with error handling
   useEffect(() => {
     if (timeline) {
-      console.log('🔄 Timeline ready, auto-restoring state...');
       setTimeout(() => {
         try {
           restoreState();
         } catch (error) {
-          console.error('❌ Auto-restore failed:', error);
-          console.log('🧹 Clearing corrupted data...');
+          console.error('Auto-restore failed:', error);
           localStorage.removeItem('remotion-editor-state');
         }
       }, 500); // Wait for timeline to be fully initialized
